@@ -24,9 +24,14 @@ sources it automatically.
 pnpm install
 pnpm android        # build and run the Android dev client
 pnpm ios            # build and run the iOS dev client
+pnpm ios:fast       # iOS only: build without code signing, install, launch (~10s warm)
 ```
 
 Native modules require a development build; Expo Go is not supported.
+
+`pnpm ios:fast` skips prebuild, pod install and Metro startup, so run `pnpm ios` once first and
+keep `pnpm --filter @projectx/mobile start` running. It is simulator-only; device builds need
+signing. Override the simulator with `IOS_DEVICE="iPhone 17" pnpm ios:fast`.
 
 ## Checks
 
