@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Icon } from "../icons";
 import { colors, HIT_SLOP, radius, space, typography } from "../theme";
 import type { SourceRef, ViewTurn } from "../types";
+import { Markdown } from "../markdown/Markdown";
 import { Thought } from "./Thought";
 
 export interface TranscriptProps {
@@ -48,10 +49,12 @@ export function Transcript({
             ) : null}
 
             {turn.status === "streaming" && turn.text.length === 0 ? (
-              <Text style={styles.thinking}>Thinking…</Text>
+              <Text style={styles.thinking}>
+                {turn.reasoningRequested === false ? "Generating…" : "Thinking…"}
+              </Text>
             ) : null}
 
-            {turn.text.length > 0 ? <Text style={styles.body}>{turn.text}</Text> : null}
+            {turn.text.length > 0 ? <Markdown text={turn.text} /> : null}
 
             {turn.status === "streaming" ? null : (
               <Actions
