@@ -35,7 +35,7 @@ export function Transcript({
           </View>
         ) : (
           <View key={turn.id} style={styles.assistantRow}>
-            {turn.reasoning ? (
+            {turn.reasoningRequested !== false && turn.reasoning ? (
               <Thought
                 summary={summarise(turn)}
                 reasoning={turn.reasoning}
@@ -47,8 +47,39 @@ export function Transcript({
               />
             ) : null}
 
-            <Text style={styles.body}>{turn.text}</Text>
+            {turn.status === "streaming" && turn.text.length === 0 ? (
+              <Text style={styles.thinking}>Thinking…</Text>
+            ) : null}
 
+            {turn.text.length > 0 ? <Text style={styles.body}>{turn.text}</Text> : null}
+
+            {turn.status === "streaming" ? null : (
+              <Actions
+                turn={turn}
+                onCopy={onCopy}
+                onRegenerate={onRegenerate}
+                onReadAloud={onReadAloud}
+                onOpenSources={onOpenSources}
+              />
+            )}
+          </View>
+        ),
+      )}
+    </View>
+  );
+}
+
+interface ActionsProps {
+  readonly turn: ViewTurn;
+  readonly onCopy: (turnId: string) => void;
+  readonly onRegenerate: (turnId: string) => void;
+  readonly onReadAloud: (turnId: string) => void;
+  readonly onOpenSources: (turnId: string) => void;
+}
+
+function Actions({ turn, onCopy, onRegenerate, onReadAloud, onOpenSources }: ActionsProps): ReactElement {
+  return (
+    <>
             {turn.artifact ? (
               <View style={styles.artifact}>
                 <View style={styles.thumbnail} />
@@ -102,10 +133,7 @@ export function Transcript({
             {turn.cost ? <Text style={styles.cost}>{costLine(turn.cost)}</Text> : null}
 
             <Text style={styles.disclaimer}>{DISCLAIMER}</Text>
-          </View>
-        ),
-      )}
-    </View>
+    </>
   );
 }
 
@@ -166,6 +194,7 @@ const styles = StyleSheet.create({
   userText: { fontSize: typography.body, lineHeight: typography.bodyLineHeight, color: "#e6dfd4" },
   assistantRow: { marginTop: space.sm },
   body: { fontSize: typography.body, lineHeight: typography.bodyLineHeight, color: colors.text },
+  thinking: { fontSize: typography.body, lineHeight: typography.bodyLineHeight, color: colors.textFaint },
   artifact: {
     flexDirection: "row",
     alignItems: "center",

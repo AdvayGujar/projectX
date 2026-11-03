@@ -27,10 +27,16 @@ export interface TurnArtifact {
   readonly subtitle: string;
 }
 
+export type TurnViewStatus = "streaming" | "done" | "error";
+
 export interface ViewTurn {
   readonly id: string;
   readonly role: TurnRole;
   readonly text: string;
+  /** Absent means a stored turn, which is always finished. */
+  readonly status?: TurnViewStatus;
+  /** False when the turn ran with Think off, so reasoning is not shown. */
+  readonly reasoningRequested?: boolean;
   readonly reasoning?: string;
   readonly activity?: readonly ToolActivity[];
   readonly artifact?: TurnArtifact;

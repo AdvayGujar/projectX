@@ -22,6 +22,7 @@ export const ICON_NAMES = [
   "slides",
   "think",
   "chevron",
+  "send",
 ] as const;
 
 export type IconName = (typeof ICON_NAMES)[number];
@@ -102,6 +103,7 @@ export function Icon({ name, color, size = 18, strokeWidth = 1.7 }: IconProps): 
       )}
       {name === "think" && <Path d="M12 4.5v15M4.5 12h15M7 7l10 10M17 7 7 17" />}
       {name === "chevron" && <Path d="M9 6l6 6-6 6" />}
+      {name === "send" && <Path d="M12 19V5M6 11l6-6 6 6" />}
     </Svg>
   );
 }
