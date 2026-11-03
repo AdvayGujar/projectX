@@ -1,6 +1,7 @@
 import { StatusBar } from "expo-status-bar";
 import * as FileSystem from "expo-file-system/legacy";
 import { useEffect, useRef, useState } from "react";
+import type { ReactElement } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -13,14 +14,14 @@ import {
   View,
 } from "react-native";
 
-import { generateDocx, generatePdf, generatePptx, generateXlsx } from "./src/spike/files";
-import { ListSpike } from "./src/spike/ListSpike";
-import { parseAction, type SpikeAction } from "./src/spike/links";
-import { extractFixturePdf, extractPickedPdf } from "./src/spike/pdf";
-import { runDbCheck } from "./src/spike/db";
-import { runSqlitePerf } from "./src/spike/sqlite";
-import { testStreaming, type Provider } from "./src/spike/streaming";
-import type { SpikeResult } from "./src/spike/types";
+import { generateDocx, generatePdf, generatePptx, generateXlsx } from "./files";
+import { ListSpike } from "./ListSpike";
+import { parseAction, type SpikeAction } from "./links";
+import { extractFixturePdf, extractPickedPdf } from "./pdf";
+import { runDbCheck } from "./db";
+import { runSqlitePerf } from "./sqlite";
+import { testStreaming, type Provider } from "./streaming";
+import type { SpikeResult } from "./types";
 
 type Action = () => Promise<SpikeResult | void>;
 
@@ -33,7 +34,7 @@ const ACTION_RUNNERS: Record<Exclude<SpikeAction, "list">, { label: string; run:
   "pdf-fixture": { label: "PDF fixture", run: extractFixturePdf },
 };
 
-export default function App() {
+export function SpikeHarness(): ReactElement {
   const [busy, setBusy] = useState<string | null>(null);
   const [lines, setLines] = useState<string[]>(["M0 spike harness"]);
   const [apiKey, setApiKey] = useState("");
