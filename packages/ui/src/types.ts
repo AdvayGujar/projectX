@@ -53,6 +53,12 @@ export interface ModelOption {
   readonly reasoning: boolean;
 }
 
+/** A file picked in the composer. Not yet uploaded or sent. */
+export interface AttachmentChip {
+  readonly id: string;
+  readonly name: string;
+}
+
 /** Effort levels offered after choosing a reasoning-capable model. */
 export const REASONING_EFFORTS = ["Low", "Medium", "High"] as const;
 export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];

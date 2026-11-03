@@ -2,10 +2,13 @@ import type { ReactElement } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { Icon } from "../icons";
-import { colors, HIT_SLOP, radius, space } from "../theme";
+import { colors, HIT_SLOP, radius, space, typography } from "../theme";
+import type { AttachmentChip } from "../types";
 
 export interface ComposerProps {
   readonly value: string;
+  readonly attachments: readonly AttachmentChip[];
+  readonly onRemoveAttachment: (id: string) => void;
   readonly placeholder: string;
   readonly think: boolean;
   readonly search: boolean;
@@ -23,6 +26,8 @@ export interface ComposerProps {
  */
 export function Composer({
   value,
+  attachments,
+  onRemoveAttachment,
   placeholder,
   think,
   search,
@@ -38,6 +43,27 @@ export function Composer({
   return (
     <View style={styles.wrap}>
       <View style={styles.composer}>
+        {attachments.length > 0 ? (
+          <View style={styles.attachments}>
+            {attachments.map((attachment) => (
+              <View key={attachment.id} style={styles.attachment}>
+                <Icon name="attach" size={12} color={colors.textMuted} />
+                <Text style={styles.attachmentName} numberOfLines={1}>
+                  {attachment.name}
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove ${attachment.name}`}
+                  hitSlop={HIT_SLOP}
+                  onPress={() => onRemoveAttachment(attachment.id)}
+                >
+                  <Icon name="close" size={12} color={colors.textMuted} />
+                </Pressable>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
         <View style={styles.modes}>
           <ModeChip label="Think" icon="think" active={think} onPress={onToggleThink} />
           <ModeChip label="Search" icon="search" active={search} onPress={onToggleSearch} />
@@ -115,6 +141,19 @@ const styles = StyleSheet.create({
     gap: space.xs,
   },
   modes: { flexDirection: "row", gap: 6, paddingHorizontal: 2, paddingBottom: 2 },
+  attachments: { flexDirection: "row", flexWrap: "wrap", gap: 6, paddingHorizontal: 2, paddingBottom: 4 },
+  attachment: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    maxWidth: "100%",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+    borderRadius: radius.pill,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  attachmentName: { maxWidth: 200, fontSize: typography.small, color: colors.textMuted },
   chip: {
     flexDirection: "row",
     alignItems: "center",
