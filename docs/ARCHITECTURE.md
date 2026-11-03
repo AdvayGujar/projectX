@@ -113,24 +113,34 @@ A different shell supplies its own sink instead of importing the app's stores.
 `src/screens/session/` — `SessionTopBar`, `SessionBody`, `SessionComposerSection` — and owns
 state plus the sheets. Adding a section means adding a component and one JSX line.
 
-**Tests.** Vitest runs in all three packages. Pure logic is extracted so it can be tested
-without a renderer: `packages/ui/src/markdown/parse.ts`, `packages/ui/src/session/format.ts`,
-`apps/mobile/src/services/turnMath.ts`, the stores.
+**Tests.** Two runners, split by what they can see:
+
+| Runner | Where | Covers |
+|---|---|---|
+| Vitest | `packages/core`, `packages/ui` | engine, database, providers, pure markdown and formatting, module boundaries |
+| Jest + jest-expo + RNTL | `apps/mobile` | component rendering, stores, turn maths |
+
+Pure logic is extracted so it can be tested without a renderer: `packages/ui/src/markdown/parse.ts`,
+`packages/ui/src/session/format.ts`, `apps/mobile/src/services/turnMath.ts`. Component tests
+live in `apps/mobile` because that is where the Expo renderer is configured; they import
+`@projectx/ui` directly.
 
 ```
 pnpm test                                   # every package
 pnpm --filter @projectx/ui test             # one package
+pnpm --filter @projectx/mobile test         # jest
 ```
+
+`packages/core/src/__tests__/boundaries.test.ts` enforces the module rules below by reading
+the import graph; it fails CI if a deep import appears.
 
 ## Remaining weak seams
 
 1. **No `internal/` split yet.** Modules are folders inside one package, so "only import the
-   public entry" is enforced by review, not by structure.
-2. **`packages/ui` depends directly on `react-native-svg` and `react-native-safe-area-context`**
-   rather than declaring them as peers. Correct for now, worth tightening before the package
-   is published or reused.
-3. **React components are not rendered in tests.** Coverage is on pure logic, stores and the
-   port; screen-level behaviour is still verified by running the app.
+   public entry" is enforced by `boundaries.test.ts` and review, not by structure.
+2. **Two test runners.** Vitest for core/ui, Jest for mobile, because Expo's renderer preset
+   only ships for Jest. Component tests therefore live in `apps/mobile` even when they assert
+   `packages/ui` behaviour.
 
 ## Conventions worth repeating
 
