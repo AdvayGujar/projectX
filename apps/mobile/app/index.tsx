@@ -1,13 +1,14 @@
-import type { EmptyAction } from "@projectx/ui";
+import type { AttachmentChip, EmptyAction } from "@projectx/ui";
 import { Composer, EmptyState, ModelPickerSheet, SessionHeader, colors } from "@projectx/ui";
+import * as DocumentPicker from "expo-document-picker";
 import { useRouter } from "expo-router";
 import type { ReactElement } from "react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useOpenDrawer } from "../src/navigation/useOpenDrawer";
-import { listAvailableModels } from "../src/services/providerService";
+import { useModelCatalog } from "../src/state/useModelCatalog";
 import { useModelStore } from "../src/state/modelStore";
 
 const EMPTY_ACTIONS: readonly EmptyAction[] = [
@@ -25,16 +26,14 @@ export default function ChatsScreen(): ReactElement {
   const models = useModelStore((state) => state.models);
   const currentModel = useModelStore((state) => state.current);
   const selectModel = useModelStore((state) => state.select);
-  const setModels = useModelStore((state) => state.setModels);
 
   const [text, setText] = useState("");
   const [think, setThink] = useState(true);
   const [search, setSearch] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [attachments, setAttachments] = useState<readonly AttachmentChip[]>([]);
 
-  useEffect(() => {
-    void listAvailableModels().then(setModels);
-  }, [setModels]);
+  useModelCatalog();
 
   function send(): void {
     if (text.trim().length === 0) {
@@ -43,16 +42,28 @@ export default function ChatsScreen(): ReactElement {
     router.push({ pathname: "/session/[id]", params: { id: DEMO_SESSION_ID } });
   }
 
+  async function attach(): Promise<void> {
+    const result = await DocumentPicker.getDocumentAsync({
+      copyToCacheDirectory: true,
+      multiple: false,
+    });
+    const asset = result.assets?.[0];
+    if (result.canceled || !asset) {
+      return;
+    }
+    setAttachments((current) => [...current, { id: asset.uri, name: asset.name }]);
+  }
+
   function runEmptyAction(key: string): void {
     if (key === "project") {
       router.push("/projects");
       return;
     }
-    setText(
-      key === "slides"
-        ? "Make a deck from the document I attach."
-        : "Summarise the document I attach.",
-    );
+    if (key === "attach") {
+      void attach();
+      return;
+    }
+    setText("Make a deck from the attached document.");
   }
 
   return (
@@ -71,10 +82,14 @@ export default function ChatsScreen(): ReactElement {
         placeholder="Ask me. Task me."
         think={think}
         search={search}
+        attachments={attachments}
+        onRemoveAttachment={(id) => setAttachments((current) => current.filter((item) => item.id !== id))}
         onChangeText={setText}
         onToggleThink={() => setThink((value) => !value)}
         onToggleSearch={() => setSearch((value) => !value)}
-        onAttach={() => setText("Summarise the document I attach.")}
+        onAttach={() => {
+          void attach();
+        }}
         onSend={send}
         onRecord={() => undefined}
       />

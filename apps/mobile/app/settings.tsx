@@ -73,6 +73,7 @@ export default function SettingsScreen(): ReactElement {
     try {
       await addProvider(input);
       await reload();
+      setModels(await listAvailableModels());
       setSheetOpen(false);
     } catch (failure) {
       setError(describe(failure));
