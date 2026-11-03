@@ -44,6 +44,19 @@ export interface DrawerDestination {
   readonly icon: IconName;
 }
 
+/** One selectable model, flattened across providers for the picker. */
+export interface ModelOption {
+  readonly id: string;
+  readonly label: string;
+  readonly provider: string;
+  readonly effort: string;
+  readonly reasoning: boolean;
+}
+
+/** Effort levels offered after choosing a reasoning-capable model. */
+export const REASONING_EFFORTS = ["Low", "Medium", "High"] as const;
+export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
+
 export interface RecentSession {
   readonly id: string;
   readonly title: string;

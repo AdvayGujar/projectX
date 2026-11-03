@@ -17,7 +17,7 @@ export { ProviderList } from "./settings/ProviderList";
 export type { ProviderListProps, ProviderSummary } from "./settings/ProviderList";
 
 export { ModelPickerSheet } from "./session/ModelPickerSheet";
-export type { ModelOption, ModelPickerSheetProps } from "./session/ModelPickerSheet";
+export type { ModelPickerSheetProps } from "./session/ModelPickerSheet";
 
 export { SessionHeader } from "./session/SessionHeader";
 export type { SessionHeaderProps } from "./session/SessionHeader";
@@ -36,8 +36,11 @@ export type { TranscriptProps } from "./session/Transcript";
 
 export { colors, HIT_SLOP, monoFont, radius, space, typography } from "./theme";
 
+export { REASONING_EFFORTS } from "./types";
 export type {
   DrawerDestination,
+  ModelOption,
+  ReasoningEffort,
   RecentSession,
   SourceRef,
   ToolActivity,
