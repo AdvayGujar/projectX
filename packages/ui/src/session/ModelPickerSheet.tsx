@@ -134,7 +134,7 @@ function ModelStep({
         />
       </View>
 
-      <ScrollView keyboardShouldPersistTaps="handled">
+      <ScrollView style={styles.list} keyboardShouldPersistTaps="handled">
         {isEmpty ? (
           <Text style={styles.empty}>No models yet. Add a provider in Settings first.</Text>
         ) : null}
@@ -183,7 +183,7 @@ function EffortStep({
   return (
     <View style={styles.step}>
       <Text style={styles.effortModel}>{model.label}</Text>
-      <ScrollView>
+      <ScrollView style={styles.list}>
         {REASONING_EFFORTS.map((effort) => (
           <Pressable
             key={effort}
@@ -230,7 +230,7 @@ function groupByProvider(models: readonly ModelOption[], query: string): ModelGr
 const styles = StyleSheet.create({
   scrim: { flex: 1, backgroundColor: colors.scrim, justifyContent: "flex-end" },
   sheet: {
-    maxHeight: "78%",
+    height: "78%",
     backgroundColor: colors.raised,
     borderTopLeftRadius: radius.sheet,
     borderTopRightRadius: radius.sheet,
@@ -245,7 +245,7 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 13, fontWeight: "600", color: colors.text },
   headSpacer: { width: 16 },
-  step: { flexShrink: 1 },
+  step: { flex: 1, minHeight: 0 },
   backChevron: { transform: [{ rotate: "180deg" }] },
   search: {
     flexDirection: "row",
@@ -258,6 +258,7 @@ const styles = StyleSheet.create({
     marginBottom: space.sm,
   },
   searchInput: { flex: 1, fontSize: typography.label, color: colors.text, padding: 0 },
+  list: { flex: 1 },
   groupLabel: {
     marginTop: space.md,
     marginBottom: space.xs,
