@@ -10,6 +10,8 @@ export type {
   UpdatePartInput,
 } from "./repositories/messages";
 export { createProjectRepository } from "./repositories/projects";
+export { createProviderRepository } from "./repositories/providers";
+export type { AddProviderInput, ProviderRecord, ProviderRepository } from "./repositories/providers";
 export type {
   CreateProjectInput,
   ProjectRepository,
