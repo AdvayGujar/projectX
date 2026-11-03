@@ -1,0 +1,25 @@
+node_modules/
+.pnpm-store/
+.expo/
+.expo-shared/
+dist/
+dist-ios/
+build/
+coverage/
+spikes/out/
+apps/mobile/ios/
+apps/mobile/android/
+apps/mobile/.expo/
+.env
+.env.*
+!.env.example
+.DS_Store
+*.log
+
+# Local planning notes and design references (not needed to build or run)
+plan.md
+docs/FAILURES.md
+docs/UI_FEATURES.md
+docs/UI_ARCHITECTURE.md
+docs/UI_SPEC.md
+UI_Inspiration/

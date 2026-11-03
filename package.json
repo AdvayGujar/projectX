@@ -1,0 +1,34 @@
+{
+  "name": "projectx",
+  "private": true,
+  "packageManager": "pnpm@12.6.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "op-sqlite": {
+    "fts5": true
+  },
+  "scripts": {
+    "typecheck": "pnpm -r --if-present typecheck",
+    "lint": "pnpm -r --if-present lint",
+    "test": "pnpm -r --if-present test",
+    "ios": "pnpm --filter @projectx/mobile ios",
+    "android": "bash scripts/run-android.sh",
+    "clean": "bash scripts/clean.sh",
+    "spike": "node spikes/node/run-all.mjs",
+    "fixture:pdf": "node spikes/node/pdf-fixture.mjs",
+    "mock:sse": "node spikes/mock-sse-server.mjs",
+    "prototype:ui": "open apps/mobile/prototype/session-ui.html"
+  },
+  "devDependencies": {
+    "docx": "^9.15.1",
+    "jszip": "^3.10.2",
+    "pdf-lib": "^1.17.1",
+    "pptxgenjs": "^4.0.1",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.5",
+    "write-excel-file": "^4.1.1",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
+    "zod": "^4.6.7"
+  }
+}
