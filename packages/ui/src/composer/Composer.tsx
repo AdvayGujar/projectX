@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Icon } from "../icons";
 import { colors, HIT_SLOP, radius, space, typography } from "../theme";
@@ -38,10 +39,11 @@ export function Composer({
   onSend,
   onRecord,
 }: ComposerProps): ReactElement {
+  const insets = useSafeAreaInsets();
   const canSend = value.trim().length > 0;
 
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, { paddingBottom: insets.bottom + space.sm }]}>
       <View style={styles.composer}>
         {attachments.length > 0 ? (
           <View style={styles.attachments}>
@@ -132,7 +134,7 @@ function ModeChip({ label, icon, active, onPress }: ModeChipProps): ReactElement
 }
 
 const styles = StyleSheet.create({
-  wrap: { paddingHorizontal: space.md, paddingTop: space.sm, paddingBottom: space.lg },
+  wrap: { paddingHorizontal: space.md, paddingTop: space.sm },
   composer: {
     borderRadius: radius.composer,
     backgroundColor: colors.composer,
