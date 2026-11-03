@@ -14,9 +14,17 @@ export interface SessionSummary {
   readonly title: string;
 }
 
+export interface SessionTotals {
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+  readonly costUsd: number | null;
+  readonly costComplete: boolean;
+}
+
 export interface LoadedSession {
   readonly title: string;
   readonly turns: readonly ViewTurn[];
+  readonly totals: SessionTotals;
 }
 
 interface PriceEntry {
@@ -53,7 +61,46 @@ export async function loadSession(sessionId: string): Promise<LoadedSession | nu
   }
   const messages = await createMessageRepository(context).list(sessionId, { limit: 200 });
   const prices = await loadPrices();
-  return { title: session.title, turns: messages.map((message) => toTurn(message, prices)).filter(isTurn) };
+  return {
+    title: session.title,
+    turns: messages.map((message) => toTurn(message, prices)).filter(isTurn),
+    totals: totalsOf(messages, prices),
+  };
+}
+
+function totalsOf(messages: readonly MessageWithParts[], prices: Map<string, PriceEntry>): SessionTotals {
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let costUsd = 0;
+  let costComplete = true;
+
+  for (const message of messages) {
+    if (message.role !== "assistant") {
+      continue;
+    }
+    inputTokens += message.inputTokens ?? 0;
+    outputTokens += message.outputTokens ?? 0;
+    const cost = numericCost(message, prices);
+    if (cost === null) {
+      costComplete = false;
+    } else {
+      costUsd += cost;
+    }
+  }
+
+  return { inputTokens, outputTokens, costUsd: costComplete ? costUsd : null, costComplete };
+}
+
+function numericCost(message: MessageWithParts, prices: Map<string, PriceEntry>): number | null {
+  if (message.costUsd !== null) {
+    return message.costUsd;
+  }
+  const key = `${message.providerId ?? ""}:${message.modelId ?? ""}`;
+  const pricing = prices.get(key)?.pricing;
+  if (!pricing) {
+    return null;
+  }
+  return perMillion(message.inputTokens ?? 0, message.outputTokens ?? 0, pricing);
 }
 
 function toTurn(message: MessageWithParts, prices: Map<string, PriceEntry>): ViewTurn | null {

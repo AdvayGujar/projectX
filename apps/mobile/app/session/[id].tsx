@@ -1,6 +1,7 @@
 import type { AttachmentChip, SourceRef } from "@projectx/ui";
 import {
   Composer,
+  CostSummary,
   ModelPickerSheet,
   SessionHeader,
   SessionMenu,
@@ -46,6 +47,7 @@ export default function SessionScreen(): ReactElement {
   const title = useSessionStore((state) => state.title);
   const streaming = useSessionStore((state) => state.streaming);
   const error = useSessionStore((state) => state.error);
+  const usage = useSessionStore((state) => state.usage);
   const activeSessionId = useSessionStore((state) => state.activeSessionId);
   const beginSession = useSessionStore((state) => state.beginSession);
   const setError = useSessionStore((state) => state.setError);
@@ -71,7 +73,7 @@ export default function SessionScreen(): ReactElement {
           return;
         }
         if (loaded) {
-          beginSession(sessionId, loaded.title, loaded.turns);
+          beginSession(sessionId, loaded.title, loaded.turns, loaded.totals);
         } else {
           setError("Chat not found.");
         }
@@ -162,6 +164,8 @@ export default function SessionScreen(): ReactElement {
         )}
         {error && turns.length > 0 ? <Text style={styles.error}>{error}</Text> : null}
       </ScrollView>
+
+      <CostSummary usage={usage} />
 
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <Composer

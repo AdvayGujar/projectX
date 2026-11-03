@@ -129,9 +129,16 @@ export async function sendTurn(input: SendTurnInput): Promise<void> {
               state.appendReasoning(event.messageId, event.text);
             }
             break;
-          case "usage":
-            state.setCost(event.messageId, costOf(event.usage, model, selection.effort));
+          case "usage": {
+            const cost = costOf(event.usage, model, selection.effort);
+            state.setCost(event.messageId, cost.turn);
+            state.addUsage({
+              inputTokens: event.usage.inputTokens,
+              outputTokens: event.usage.outputTokens,
+              costUsd: cost.usd,
+            });
             break;
+          }
           case "error":
             state.setError(event.message);
             break;
@@ -178,7 +185,12 @@ async function findModel(models: readonly ModelInfo[], modelId: string): Promise
   return model;
 }
 
-function costOf(usage: Usage, model: ModelInfo, effort: string): TurnCost {
+interface PricedCost {
+  readonly turn: TurnCost;
+  readonly usd: number | null;
+}
+
+function costOf(usage: Usage, model: ModelInfo, effort: string): PricedCost {
   const input = usage.inputTokens ?? 0;
   const output = usage.outputTokens ?? 0;
   const usd =
@@ -186,10 +198,13 @@ function costOf(usage: Usage, model: ModelInfo, effort: string): TurnCost {
     (model.pricing ? (input * model.pricing.input + output * model.pricing.output) / 1_000_000 : null);
 
   return {
-    model: model.label,
-    effort,
-    tokens: `${input.toLocaleString()} in / ${output.toLocaleString()} out`,
-    ...(usd === null ? {} : { usd: `$${usd.toFixed(4)}` }),
+    usd,
+    turn: {
+      model: model.label,
+      effort,
+      tokens: `${input.toLocaleString()} in / ${output.toLocaleString()} out`,
+      ...(usd === null ? {} : { usd: `$${usd.toFixed(4)}` }),
+    },
   };
 }
 
