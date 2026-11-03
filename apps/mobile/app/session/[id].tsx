@@ -5,7 +5,7 @@ import { useLocalSearchParams } from "expo-router";
 import * as Speech from "expo-speech";
 import type { ReactElement } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { KeyboardAvoidingView, Platform, StyleSheet, View } from "react-native";
 
 import { useOpenDrawer } from "../../src/navigation/useOpenDrawer";
 import { SessionBody } from "../../src/screens/session/SessionBody";
@@ -124,8 +124,12 @@ export default function SessionScreen(): ReactElement {
   }
 
   return (
-    <View style={styles.root}>
-      <SessionTopBar
+    <KeyboardAvoidingView
+      style={styles.root}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
+      <View style={styles.fill}>
+        <SessionTopBar
         modelLabel={currentModel?.label ?? "Select model"}
         effort={currentModel?.effort}
         onOpenDrawer={openDrawer}
@@ -181,10 +185,12 @@ export default function SessionScreen(): ReactElement {
         onSelect={(model, effort) => selectModel(model, effort)}
         onClose={() => setPickerOpen(false)}
       />
-    </View>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.canvas },
+  fill: { flex: 1 },
 });
