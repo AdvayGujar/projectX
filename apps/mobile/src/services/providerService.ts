@@ -1,4 +1,5 @@
 import type { FetchLike, ModelInfo, ProviderRecord } from "@projectx/core";
+import type { ModelOption } from "@projectx/ui";
 import {
   AppError,
   createProviderConfig,
@@ -67,4 +68,31 @@ export async function listProviders(): Promise<ProviderRecord[]> {
 export async function listModels(providerId: string): Promise<ModelInfo[]> {
   const context = await getDbContext();
   return createProviderRepository(context).listModels(providerId);
+}
+
+/**
+ * Flattens every enabled provider's cached models into picker options. The id is prefixed
+ * with the provider row id because two providers can expose the same model slug.
+ */
+export async function listAvailableModels(): Promise<ModelOption[]> {
+  const context = await getDbContext();
+  const repository = createProviderRepository(context);
+  const providers = await repository.list();
+
+  const perProvider = await Promise.all(
+    providers
+      .filter((provider) => provider.enabled)
+      .map(async (provider) => {
+        const models = await repository.listModels(provider.id);
+        return models.map((model): ModelOption => ({
+          id: `${provider.id}:${model.id}`,
+          label: model.label,
+          provider: provider.label,
+          effort: model.capabilities.reasoning ? "Medium" : "Standard",
+          reasoning: model.capabilities.reasoning,
+        }));
+      }),
+  );
+
+  return perProvider.flat();
 }

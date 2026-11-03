@@ -22,7 +22,7 @@ export interface DrawerShellProps {
 }
 
 const DESTINATIONS: readonly DrawerDestination[] = [
-  { key: "chats", label: "Chats", icon: "bubble" },
+  { key: "chats", label: "New Chat", icon: "bubble" },
   { key: "projects", label: "Projects", icon: "folder" },
   { key: "artifacts", label: "Artifacts", icon: "layers" },
 ];
