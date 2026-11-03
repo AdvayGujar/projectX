@@ -10,7 +10,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "echo \"no ui tests yet\"",
+    "test": "vitest run",
     "lint": "echo \"lint not configured yet\""
   },
   "peerDependencies": {
@@ -23,6 +23,7 @@
   },
   "devDependencies": {
     "@types/react": "~19.3.0",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.5"
   }
 }
