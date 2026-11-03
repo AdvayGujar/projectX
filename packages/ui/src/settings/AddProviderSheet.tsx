@@ -1,6 +1,16 @@
 import type { ReactElement } from "react";
 import { useEffect, useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Icon } from "../icons";
@@ -60,7 +70,17 @@ export function AddProviderSheet({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
-      <Pressable accessibilityRole="button" accessibilityLabel="Close" style={styles.scrim} onPress={close}>
+      <KeyboardAvoidingView
+        style={styles.fill}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <View style={styles.scrim}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+            style={StyleSheet.absoluteFill}
+            onPress={close}
+          />
         <View style={[styles.sheet, { paddingBottom: insets.bottom + space.xl }]}>
           <View style={styles.head}>
             <Pressable accessibilityRole="button" accessibilityLabel="Close" hitSlop={HIT_SLOP} onPress={close}>
@@ -139,13 +159,15 @@ export function AddProviderSheet({
               <Text style={styles.submitLabel}>{busy ? "Checking key…" : "Validate and save"}</Text>
             </Pressable>
           </ScrollView>
+          </View>
         </View>
-      </Pressable>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  fill: { flex: 1 },
   scrim: { flex: 1, backgroundColor: colors.scrim, justifyContent: "flex-end" },
   sheet: {
     maxHeight: "82%",

@@ -1,7 +1,9 @@
 import type { ReactElement } from "react";
 import { useMemo, useState } from "react";
 import {
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -66,7 +68,17 @@ export function ModelPickerSheet({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
-      <Pressable accessibilityRole="button" accessibilityLabel="Close model picker" style={styles.scrim} onPress={close}>
+      <KeyboardAvoidingView
+        style={styles.fill}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <View style={styles.scrim}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Close model picker"
+            style={StyleSheet.absoluteFill}
+            onPress={close}
+          />
         <View style={[styles.sheet, { paddingBottom: insets.bottom + space.xl }]}>
           <View style={styles.head}>
             <Pressable
@@ -95,8 +107,9 @@ export function ModelPickerSheet({
               isEmpty={models.length === 0}
             />
           )}
+          </View>
         </View>
-      </Pressable>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -228,6 +241,7 @@ function groupByProvider(models: readonly ModelOption[], query: string): ModelGr
 }
 
 const styles = StyleSheet.create({
+  fill: { flex: 1 },
   scrim: { flex: 1, backgroundColor: colors.scrim, justifyContent: "flex-end" },
   sheet: {
     height: "78%",
