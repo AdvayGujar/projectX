@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useOpenDrawer } from "../src/navigation/useOpenDrawer";
 import { createSession } from "../src/services/sessionQueries";
-import { sendTurn } from "../src/services/turnService";
+import { turnService } from "../src/services/turnService";
 import { useModelCatalog } from "../src/state/useModelCatalog";
 import { useSessionStore } from "../src/state/sessionStore";
 import { useModelStore } from "../src/state/modelStore";
@@ -63,7 +63,13 @@ export default function ChatsScreen(): ReactElement {
       useSessionStore.getState().beginSession(sessionId, value.slice(0, 60), []);
       setText("");
       router.push({ pathname: "/session/[id]", params: { id: sessionId } });
-      void sendTurn({ sessionId, text: value, think });
+      void turnService.send({
+        sessionId,
+        selectionId: selection.id,
+        effort: selection.effort,
+        text: value,
+        think,
+      });
     } catch {
       setError("Could not start the chat.");
     }
