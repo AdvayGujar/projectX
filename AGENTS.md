@@ -227,8 +227,21 @@ ProjectX-specific. Every change lands through a pull request; nothing is committ
 2. Commit in logical units on the branch — not one commit for everything.
 3. Push the branch and open a PR against `master`. The body follows the `pr` skill:
    Summary, Evidence, Merge Danger.
-4. Merge once typecheck, lint, and tests pass. Squash by default so `master` stays linear.
-5. Delete the branch afterwards, on the remote and locally.
+4. **Stop.** The owner reviews and merges. The agent never merges, closes, or approves a pull
+   request, and never pushes to `master` — not even for a one-line fix.
+5. Merge only when the owner explicitly asks for it in chat. Squash by default so `master` stays
+   linear.
+6. After a merge, clean up: switch to `master`, pull, and delete the branch locally.
+
+### Pull requests at session start
+
+Before any new work, check what happened to the PRs raised in earlier sessions
+(`gh pr list --state open` plus the most recent closed ones):
+
+- **Merged** → pull `master`, delete the local branch, and confirm the tree is clean.
+- **Has review comments from the owner** → read them and implement exactly what was asked, on
+  the same branch.
+- **Open and untouched** → leave it alone and mention it in the first reply.
 
 This applies to documentation and one-line fixes too. If a change is worth making, it is worth
 a branch.
@@ -248,7 +261,8 @@ a branch.
 1. Read `~/.dsh/LESSONS.md` and `docs/FAILURES.md` if present.
 2. Read this file and the plan at `plan.md`.
 3. Check `docs/FAILURES.md` before retrying an approach that previously failed.
-4. If a task conflicts with these rules, stop and ask.
+4. Check the pull requests raised in earlier sessions (see Git › Pull requests at session start).
+5. If a task conflicts with these rules, stop and ask.
 
 ## Commands
 
