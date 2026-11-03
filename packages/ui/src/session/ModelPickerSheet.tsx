@@ -13,6 +13,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useKeyboardVisible } from "../primitives/useKeyboardVisible";
+
 import { Icon } from "../icons";
 import { colors, HIT_SLOP, radius, space, typography } from "../theme";
 import type { ModelOption, ReasoningEffort } from "../types";
@@ -38,6 +40,7 @@ export function ModelPickerSheet({
   onClose,
 }: ModelPickerSheetProps): ReactElement {
   const insets = useSafeAreaInsets();
+  const keyboardVisible = useKeyboardVisible();
   const [query, setQuery] = useState("");
   const [pending, setPending] = useState<ModelOption | null>(null);
 
@@ -79,7 +82,12 @@ export function ModelPickerSheet({
             style={StyleSheet.absoluteFill}
             onPress={close}
           />
-        <View style={[styles.sheet, { paddingBottom: insets.bottom + space.xl }]}>
+        <View
+          style={[
+            styles.sheet,
+            { paddingBottom: keyboardVisible ? space.lg : insets.bottom + space.xl },
+          ]}
+        >
           <View style={styles.head}>
             <Pressable
               accessibilityRole="button"

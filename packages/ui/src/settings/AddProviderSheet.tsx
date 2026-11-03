@@ -13,6 +13,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useKeyboardVisible } from "../primitives/useKeyboardVisible";
+
 import { Icon } from "../icons";
 import { colors, HIT_SLOP, radius, space, typography } from "../theme";
 
@@ -44,6 +46,7 @@ export function AddProviderSheet({
   onClose,
 }: AddProviderSheetProps): ReactElement {
   const insets = useSafeAreaInsets();
+  const keyboardVisible = useKeyboardVisible();
   const [presetId, setPresetId] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [listOpen, setListOpen] = useState(false);
@@ -81,7 +84,12 @@ export function AddProviderSheet({
             style={StyleSheet.absoluteFill}
             onPress={close}
           />
-        <View style={[styles.sheet, { paddingBottom: insets.bottom + space.xl }]}>
+        <View
+          style={[
+            styles.sheet,
+            { paddingBottom: keyboardVisible ? space.lg : insets.bottom + space.xl },
+          ]}
+        >
           <View style={styles.head}>
             <Pressable accessibilityRole="button" accessibilityLabel="Close" hitSlop={HIT_SLOP} onPress={close}>
               <Icon name="close" size={16} color={colors.text} />
