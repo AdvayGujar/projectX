@@ -2,6 +2,8 @@ import type { ReactElement } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useKeyboardVisible } from "../primitives/useKeyboardVisible";
+
 import { Icon } from "../icons";
 import { colors, HIT_SLOP, radius, space, typography } from "../theme";
 import type { AttachmentChip } from "../types";
@@ -40,10 +42,13 @@ export function Composer({
   onRecord,
 }: ComposerProps): ReactElement {
   const insets = useSafeAreaInsets();
+  const keyboardVisible = useKeyboardVisible();
   const canSend = value.trim().length > 0;
 
   return (
-    <View style={[styles.wrap, { paddingBottom: insets.bottom + space.sm }]}>
+    <View
+      style={[styles.wrap, { paddingBottom: (keyboardVisible ? 0 : insets.bottom) + space.sm }]}
+    >
       <View style={styles.composer}>
         {attachments.length > 0 ? (
           <View style={styles.attachments}>

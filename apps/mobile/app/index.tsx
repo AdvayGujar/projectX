@@ -4,7 +4,7 @@ import * as DocumentPicker from "expo-document-picker";
 import { useRouter } from "expo-router";
 import type { ReactElement } from "react";
 import { useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useOpenDrawer } from "../src/navigation/useOpenDrawer";
@@ -100,7 +100,11 @@ export default function ChatsScreen(): ReactElement {
   }
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <KeyboardAvoidingView
+      style={styles.root}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
+      <View style={[styles.fill, { paddingTop: insets.top }]}>
       <SessionHeader
         model={currentModel?.label ?? "Select model"}
         effort={currentModel?.effort}
@@ -138,12 +142,14 @@ export default function ChatsScreen(): ReactElement {
         onSelect={(model, effort) => selectModel(model, effort)}
         onClose={() => setPickerOpen(false)}
       />
-    </View>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.canvas },
+  fill: { flex: 1 },
   error: {
     paddingHorizontal: 18,
     paddingBottom: 8,

@@ -1,7 +1,19 @@
 import type { ReactElement } from "react";
 import { useEffect, useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import { useKeyboardVisible } from "../primitives/useKeyboardVisible";
 
 import { Icon } from "../icons";
 import { colors, HIT_SLOP, radius, space, typography } from "../theme";
@@ -34,6 +46,7 @@ export function AddProviderSheet({
   onClose,
 }: AddProviderSheetProps): ReactElement {
   const insets = useSafeAreaInsets();
+  const keyboardVisible = useKeyboardVisible();
   const [presetId, setPresetId] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [listOpen, setListOpen] = useState(false);
@@ -60,8 +73,23 @@ export function AddProviderSheet({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
-      <Pressable accessibilityRole="button" accessibilityLabel="Close" style={styles.scrim} onPress={close}>
-        <View style={[styles.sheet, { paddingBottom: insets.bottom + space.xl }]}>
+      <KeyboardAvoidingView
+        style={styles.fill}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <View style={styles.scrim}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+            style={StyleSheet.absoluteFill}
+            onPress={close}
+          />
+        <View
+          style={[
+            styles.sheet,
+            { paddingBottom: keyboardVisible ? space.lg : insets.bottom + space.xl },
+          ]}
+        >
           <View style={styles.head}>
             <Pressable accessibilityRole="button" accessibilityLabel="Close" hitSlop={HIT_SLOP} onPress={close}>
               <Icon name="close" size={16} color={colors.text} />
@@ -139,13 +167,15 @@ export function AddProviderSheet({
               <Text style={styles.submitLabel}>{busy ? "Checking key…" : "Validate and save"}</Text>
             </Pressable>
           </ScrollView>
+          </View>
         </View>
-      </Pressable>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  fill: { flex: 1 },
   scrim: { flex: 1, backgroundColor: colors.scrim, justifyContent: "flex-end" },
   sheet: {
     maxHeight: "82%",

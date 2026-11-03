@@ -1,7 +1,9 @@
 import type { ReactElement } from "react";
 import { useMemo, useState } from "react";
 import {
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,6 +12,8 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import { useKeyboardVisible } from "../primitives/useKeyboardVisible";
 
 import { Icon } from "../icons";
 import { colors, HIT_SLOP, radius, space, typography } from "../theme";
@@ -36,6 +40,7 @@ export function ModelPickerSheet({
   onClose,
 }: ModelPickerSheetProps): ReactElement {
   const insets = useSafeAreaInsets();
+  const keyboardVisible = useKeyboardVisible();
   const [query, setQuery] = useState("");
   const [pending, setPending] = useState<ModelOption | null>(null);
 
@@ -66,8 +71,23 @@ export function ModelPickerSheet({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
-      <Pressable accessibilityRole="button" accessibilityLabel="Close model picker" style={styles.scrim} onPress={close}>
-        <View style={[styles.sheet, { paddingBottom: insets.bottom + space.xl }]}>
+      <KeyboardAvoidingView
+        style={styles.fill}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <View style={styles.scrim}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Close model picker"
+            style={StyleSheet.absoluteFill}
+            onPress={close}
+          />
+        <View
+          style={[
+            styles.sheet,
+            { paddingBottom: keyboardVisible ? space.lg : insets.bottom + space.xl },
+          ]}
+        >
           <View style={styles.head}>
             <Pressable
               accessibilityRole="button"
@@ -95,8 +115,9 @@ export function ModelPickerSheet({
               isEmpty={models.length === 0}
             />
           )}
+          </View>
         </View>
-      </Pressable>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -228,6 +249,7 @@ function groupByProvider(models: readonly ModelOption[], query: string): ModelGr
 }
 
 const styles = StyleSheet.create({
+  fill: { flex: 1 },
   scrim: { flex: 1, backgroundColor: colors.scrim, justifyContent: "flex-end" },
   sheet: {
     height: "78%",

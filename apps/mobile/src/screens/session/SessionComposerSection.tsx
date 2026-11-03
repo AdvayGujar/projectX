@@ -1,7 +1,6 @@
 import type { AttachmentChip, SessionUsageSummary } from "@projectx/ui";
 import { Composer, CostSummary } from "@projectx/ui";
 import type { ReactElement } from "react";
-import { KeyboardAvoidingView, Platform } from "react-native";
 
 export interface SessionComposerSectionProps {
   readonly text: string;
@@ -36,8 +35,7 @@ export function SessionComposerSection({
   return (
     <>
       <CostSummary usage={usage} />
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <Composer
+      <Composer
           value={text}
           placeholder="Reply or hold to talk"
           think={think}
@@ -49,9 +47,8 @@ export function SessionComposerSection({
           onAttach={onAttach}
           onRemoveAttachment={onRemoveAttachment}
           onSend={onSend}
-          onRecord={onRecord}
-        />
-      </KeyboardAvoidingView>
+        onRecord={onRecord}
+      />
     </>
   );
 }
