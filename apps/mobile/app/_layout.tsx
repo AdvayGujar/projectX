@@ -21,7 +21,14 @@ export default function RootLayout(): ReactElement {
             drawerStyle: { width: "88%", backgroundColor: colors.canvas },
             sceneStyle: { backgroundColor: colors.canvas },
           }}
-        />
+        >
+          <Drawer.Screen name="index" />
+          <Drawer.Screen name="projects" />
+          <Drawer.Screen name="artifacts" />
+          <Drawer.Screen name="settings" />
+          <Drawer.Screen name="session/[id]" />
+          <Drawer.Screen name="dev/spike" />
+        </Drawer>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
