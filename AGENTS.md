@@ -218,6 +218,21 @@ Commits:
 - No secrets, `.env`, build output, `node_modules`, or generated files.
 - Branch names: `feat/…`, `fix/…`, `chore/…`, `docs/…`.
 
+### Workflow
+
+ProjectX-specific. Every change lands through a pull request; nothing is committed straight to
+`master`.
+
+1. Branch from an up-to-date `master`, using the prefix that matches the work.
+2. Commit in logical units on the branch — not one commit for everything.
+3. Push the branch and open a PR against `master`. The body follows the `pr` skill:
+   Summary, Evidence, Merge Danger.
+4. Merge once typecheck, lint, and tests pass. Squash by default so `master` stays linear.
+5. Delete the branch afterwards, on the remote and locally.
+
+This applies to documentation and one-line fixes too. If a change is worth making, it is worth
+a branch.
+
 ## Definition of done
 
 - Typecheck, lint, and tests pass with no new suppressions.
