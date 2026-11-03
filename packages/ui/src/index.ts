@@ -7,6 +7,8 @@ export type { DrawerContentProps } from "./drawer/DrawerContent";
 export { EmptyState } from "./empty/EmptyState";
 export type { EmptyAction, EmptyStateProps } from "./empty/EmptyState";
 
+export { Markdown } from "./markdown/Markdown";
+
 export { Icon, ICON_NAMES } from "./icons";
 export type { IconName, IconProps } from "./icons";
 
@@ -24,6 +26,9 @@ export type { ProviderListProps, ProviderSummary } from "./settings/ProviderList
 
 export { ModelPickerSheet } from "./session/ModelPickerSheet";
 export type { ModelPickerSheetProps } from "./session/ModelPickerSheet";
+
+export { CostSummary } from "./session/CostSummary";
+export type { SessionUsageSummary } from "./session/CostSummary";
 
 export { SessionHeader } from "./session/SessionHeader";
 export type { SessionHeaderProps } from "./session/SessionHeader";

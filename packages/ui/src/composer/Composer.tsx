@@ -88,9 +88,9 @@ export function Composer({
             placeholderTextColor={colors.textFaint}
             onChangeText={onChangeText}
             onSubmitEditing={canSend ? onSend : undefined}
+            submitBehavior="submit"
             multiline
             returnKeyType="send"
-            blurOnSubmit={false}
           />
 
           <Pressable
@@ -100,7 +100,7 @@ export function Composer({
             onPress={canSend ? onSend : onRecord}
             style={styles.record}
           >
-            <Icon name="record" size={18} color={colors.canvas} />
+            <Icon name={canSend ? "send" : "record"} size={18} color={colors.canvas} />
           </Pressable>
         </View>
       </View>

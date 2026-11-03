@@ -2,9 +2,9 @@ import type { DrawerDestination } from "@projectx/ui";
 import { DrawerContent } from "@projectx/ui";
 import { useRouter } from "expo-router";
 import type { ReactElement } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-import { RECENT_SESSIONS } from "../fixtures/session";
+import { useSessionsStore } from "../state/sessionsStore";
 
 /**
  * Structural subset of the drawer content props. Expo Router vendors its own React
@@ -38,10 +38,16 @@ const ACCOUNT_NAME = "Advay";
 export function DrawerShell(props: DrawerShellProps): ReactElement {
   const router = useRouter();
   const [search, setSearch] = useState("");
+  const sessions = useSessionsStore((state) => state.sessions);
+  const refresh = useSessionsStore((state) => state.refresh);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
 
   const routeName = props.state.routeNames[props.state.index] ?? "index";
   const activeKey = activeKeyForRoute(routeName);
-  const recents = RECENT_SESSIONS.filter((session) =>
+  const recents = sessions.filter((session) =>
     session.title.toLowerCase().includes(search.trim().toLowerCase()),
   );
 

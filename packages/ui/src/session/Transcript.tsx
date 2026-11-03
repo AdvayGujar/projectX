@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Icon } from "../icons";
 import { colors, HIT_SLOP, radius, space, typography } from "../theme";
 import type { SourceRef, ViewTurn } from "../types";
+import { Markdown } from "../markdown/Markdown";
 import { Thought } from "./Thought";
 
 export interface TranscriptProps {
@@ -35,11 +36,11 @@ export function Transcript({
           </View>
         ) : (
           <View key={turn.id} style={styles.assistantRow}>
-            {turn.reasoning && turn.activity ? (
+            {turn.reasoningRequested !== false && turn.reasoning ? (
               <Thought
                 summary={summarise(turn)}
                 reasoning={turn.reasoning}
-                activity={turn.activity}
+                activity={turn.activity ?? []}
                 open={openThoughtId === turn.id}
                 onToggle={() =>
                   setOpenThoughtId((current) => (current === turn.id ? null : turn.id))
@@ -47,8 +48,41 @@ export function Transcript({
               />
             ) : null}
 
-            <Text style={styles.body}>{turn.text}</Text>
+            {turn.status === "streaming" && turn.text.length === 0 ? (
+              <Text style={styles.thinking}>
+                {turn.reasoningRequested === false ? "Generating…" : "Thinking…"}
+              </Text>
+            ) : null}
 
+            {turn.text.length > 0 ? <Markdown text={turn.text} /> : null}
+
+            {turn.status === "streaming" ? null : (
+              <Actions
+                turn={turn}
+                onCopy={onCopy}
+                onRegenerate={onRegenerate}
+                onReadAloud={onReadAloud}
+                onOpenSources={onOpenSources}
+              />
+            )}
+          </View>
+        ),
+      )}
+    </View>
+  );
+}
+
+interface ActionsProps {
+  readonly turn: ViewTurn;
+  readonly onCopy: (turnId: string) => void;
+  readonly onRegenerate: (turnId: string) => void;
+  readonly onReadAloud: (turnId: string) => void;
+  readonly onOpenSources: (turnId: string) => void;
+}
+
+function Actions({ turn, onCopy, onRegenerate, onReadAloud, onOpenSources }: ActionsProps): ReactElement {
+  return (
+    <>
             {turn.artifact ? (
               <View style={styles.artifact}>
                 <View style={styles.thumbnail} />
@@ -99,27 +133,30 @@ export function Transcript({
               ) : null}
             </View>
 
-            {turn.cost ? (
-              <Text style={styles.cost}>
-                {turn.cost.model} · {turn.cost.effort} · {turn.cost.tokens} · {turn.cost.usd}
-              </Text>
-            ) : null}
+            {turn.cost ? <Text style={styles.cost}>{costLine(turn.cost)}</Text> : null}
 
             <Text style={styles.disclaimer}>{DISCLAIMER}</Text>
-          </View>
-        ),
-      )}
-    </View>
+    </>
   );
 }
 
 function summarise(turn: ViewTurn): string {
   const activity = turn.activity ?? [];
-  const tools = activity.length;
   const reads = activity.filter((item) => item.kind === "read").length;
-  const toolLabel = `${tools} tool${tools === 1 ? "" : "s"}`;
-  const readLabel = `${reads} document${reads === 1 ? "" : "s"} read`;
-  return `Thought · ${toolLabel} · ${readLabel}`;
+  const parts = ["Thought"];
+  if (activity.length > 0) {
+    parts.push(`${activity.length} tool${activity.length === 1 ? "" : "s"}`);
+  }
+  if (reads > 0) {
+    parts.push(`${reads} document${reads === 1 ? "" : "s"} read`);
+  }
+  return parts.join(" · ");
+}
+
+function costLine(cost: NonNullable<ViewTurn["cost"]>): string {
+  return [cost.model, cost.effort, cost.tokens, cost.usd]
+    .filter((part): part is string => Boolean(part))
+    .join(" · ");
 }
 
 function SourceDots({ sources }: { readonly sources: readonly SourceRef[] }): ReactElement {
@@ -160,6 +197,7 @@ const styles = StyleSheet.create({
   userText: { fontSize: typography.body, lineHeight: typography.bodyLineHeight, color: "#e6dfd4" },
   assistantRow: { marginTop: space.sm },
   body: { fontSize: typography.body, lineHeight: typography.bodyLineHeight, color: colors.text },
+  thinking: { fontSize: typography.body, lineHeight: typography.bodyLineHeight, color: colors.textFaint },
   artifact: {
     flexDirection: "row",
     alignItems: "center",
