@@ -1,0 +1,552 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ProjectX — UI locked: canvas (throwaway)</title>
+<!--
+  THROWAWAY PROTOTYPE. Not production code.
+  Locked direction: Variant A "Canvas", revised 2026-11-03.
+  Revisions: SVG icon set (no emoji), Think/Search mode toggles, single record button,
+  no model label at the start of a reply (attribution lives in the cost line), composer
+  pinned to the bottom.
+  B and C are kept only as references; A is the design.
+-->
+<style>
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: #0c0a09;
+    color: #e8e2d8;
+    font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    display: flex; align-items: center; justify-content: center; gap: 40px;
+    padding: 32px;
+  }
+  .stage { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+  .tag {
+    font: 600 10px/1 ui-monospace, monospace; letter-spacing: .14em;
+    text-transform: uppercase; color: #b45309; border: 1px dashed #b45309;
+    padding: 6px 10px; border-radius: 6px;
+  }
+  .note { max-width: 330px; color: #8a8177; font-size: 12px; line-height: 1.6; }
+  .note b { color: #e8e2d8; font-weight: 600; }
+  .note code { font: 11px ui-monospace, monospace; color: #cfc7bb; }
+
+  .phone {
+    width: 390px; height: 844px; background: #000; border-radius: 46px;
+    padding: 10px; box-shadow: 0 30px 80px rgba(0,0,0,.7), 0 0 0 1px #241f1b;
+  }
+  /* the viewport is a flex column: statusbar / header / scroll / composer */
+  .viewport {
+    width: 100%; height: 100%; border-radius: 37px; overflow: hidden; position: relative;
+    display: flex; flex-direction: column; min-height: 0;
+  }
+  svg.ic { display: block; }
+
+  .statusbar {
+    height: 44px; flex: 0 0 44px; display: flex; align-items: center;
+    justify-content: space-between; padding: 0 22px; font-size: 12px; font-weight: 600;
+    opacity: .9;
+  }
+  .header {
+    flex: 0 0 auto;
+    display: grid; grid-template-columns: 40px 1fr 40px; align-items: center;
+    padding: 0 12px 10px; gap: 6px;
+  }
+  .iconbtn {
+    width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+    border: none; background: transparent; color: inherit; cursor: pointer;
+  }
+  .ping { justify-self: start; }
+  .pmenu { justify-self: end; }
+  .pillbtn {
+    justify-self: center; display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 12px; border-radius: 999px; border: 1px solid transparent;
+    font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
+  }
+  .pillbtn .dim { opacity: .55; font-weight: 500; }
+
+  .scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+  .scroll::-webkit-scrollbar { width: 0; }
+
+  .composerwrap { flex: 0 0 auto; padding: 8px 12px 18px; }
+  .composer { display: flex; flex-direction: column; gap: 4px; padding: 8px 8px 6px; }
+  .modes { display: flex; gap: 6px; padding: 0 2px 2px; }
+  .mchip {
+    display: inline-flex; align-items: center; gap: 5px;
+    border: 1px solid rgba(255,255,255,.14); background: transparent; color: inherit;
+    border-radius: 999px; padding: 5px 10px; font-size: 11.5px; font-weight: 500;
+    cursor: pointer; opacity: .75;
+  }
+  .mchip.on { background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.26); opacity: 1; }
+  .inputline { display: flex; align-items: center; gap: 8px; padding: 2px 2px 0; }
+  .input { flex: 1; min-height: 34px; display: flex; align-items: center; font-size: 13px; opacity: .55; }
+  .roundbtn {
+    flex: 0 0 auto; width: 34px; height: 34px; border-radius: 50%; display: grid;
+    place-items: center; border: none; cursor: pointer;
+  }
+
+  /* ---------- locked direction: A · canvas ---------- */
+  .v-A { background: #191614; color: #efe9df; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  .v-A .pillbtn { background: #26211d; color: #efe9df; }
+  .v-A .scroll { padding: 4px 18px 10px; }
+  .v-A .transcript { font-size: 14px; line-height: 1.55; }
+  .v-A .msg { margin-bottom: 4px; }
+  .v-A .msg.user {
+    margin-left: auto; width: fit-content; max-width: 82%;
+    background: #2b2621; border-radius: 16px; padding: 10px 13px; color: #e6dfd4;
+  }
+  .v-A .thought { margin: 22px 0 10px; font: 11px/1.5 -apple-system, sans-serif; color: #8d8378; }
+  .v-A .thought .thead { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
+  .v-A .thought .chev { transition: transform .15s ease; opacity: .8; }
+  .v-A .thought.open .chev { transform: rotate(90deg); }
+  .v-A .thoughtbody { margin: 9px 0 0 4px; padding-left: 12px; border-left: 2px solid #332d27; }
+  .v-A .thoughtbody .reason { font-size: 12.5px; line-height: 1.55; color: #a99f92; margin-bottom: 9px; }
+  .v-A .thoughtbody .trow { display: flex; gap: 7px; align-items: baseline; font: 500 11px/1.7 ui-monospace, monospace; color: #9c9287; }
+  .v-A .thoughtbody .trow b { color: #cfc7bb; font-weight: 600; }
+  .v-A .thoughtbody .trow .io { color: #7c7369; min-width: 34px; }
+  .v-A .artifact {
+    border: 1px solid #35302a; border-radius: 10px; padding: 12px 14px; margin: 14px 0;
+    display: flex; gap: 12px; align-items: center; font-family: -apple-system, sans-serif;
+  }
+  .v-A .artifact .thumb { width: 38px; height: 30px; border-radius: 4px; background: linear-gradient(135deg,#3d352c,#241f1a); }
+  .v-A .artifact .t { font-size: 13px; font-weight: 600; }
+  .v-A .artifact .s { font-size: 11px; color: #8d8378; }
+  .v-A .actions { display: flex; align-items: center; gap: 16px; margin: 16px 0 6px; color: #8d8378; }
+  .v-A .actions button { border: 0; background: none; color: inherit; cursor: pointer; padding: 0; display: grid; place-items: center; }
+  .v-A .actions button:hover { color: #efe9df; }
+  .v-A .sources { margin-left: auto; display: inline-flex; align-items: center; gap: 7px; border: 0; background: none; color: #a99f92; font-size: 11px; cursor: pointer; }
+  .v-A .stack { display: inline-flex; }
+  .v-A .dot { width: 15px; height: 15px; border-radius: 50%; border: 1.5px solid #191614; margin-left: -4px; display: inline-grid; place-items: center; font-size: 8px; font-weight: 700; font-family: -apple-system, sans-serif; }
+  .v-A .cost { font: 11px -apple-system, sans-serif; color: #776e64; margin: 0 0 18px; }
+  .v-A .disclaimer { font: 11px -apple-system, sans-serif; color: #6b635a; margin: 10px 0 4px; }
+  .v-A .composer { background: #262220; border-radius: 24px; }
+  .v-A .input { margin-left: 4px; font-family: -apple-system, sans-serif; }
+  .v-A .add { background: #332d28; color: #efe9df; }
+  .v-A .record { background: #efe9df; color: #191614; }
+
+  /* ---------- reference: B · cards ---------- */
+  .v-B { background: #101315; color: #dfe7ea; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+  .v-B .header { border-bottom: 1px solid #1e262b; padding-bottom: 12px; }
+  .v-B .pillbtn { background: #1a2227; color: #9fe8d3; border-color: #24343a; }
+  .v-B .scroll { padding: 14px; }
+  .v-B .transcript { display: flex; flex-direction: column; gap: 12px; }
+  .v-B .bubble { background: #171d21; border: 1px solid #212a30; border-radius: 14px; padding: 12px 13px; }
+  .v-B .bubble.user { background: #1d2a2e; border-color: #2a3b40; }
+  .v-B .meta { display: flex; align-items: center; gap: 8px; font-size: 10px; color: #7d949c; margin-bottom: 8px; }
+  .v-B .meta .m { color: #9fe8d3; font-weight: 600; }
+  .v-B .meta .spacer { margin-left: auto; }
+  .v-B .body { font-size: 13.5px; line-height: 1.6; }
+  .v-B .tool { display: flex; gap: 8px; align-items: center; font: 500 11px ui-monospace, monospace; color: #8fb8c0; background: #131a1e; border: 1px dashed #26343a; border-radius: 8px; padding: 7px 9px; margin: 9px 0; }
+  .v-B .artifact { display: flex; align-items: center; gap: 10px; border-radius: 10px; background: #131a1e; border: 1px solid #26343a; padding: 10px; margin: 9px 0; }
+  .v-B .artifact .thumb { width: 34px; height: 26px; border-radius: 4px; background: rgba(159,232,211,.22); }
+  .v-B .artifact .t { font-size: 12.5px; font-weight: 600; }
+  .v-B .artifact .s { font-size: 10.5px; color: #7d949c; }
+  .v-B .actions { display: flex; gap: 6px; margin-top: 12px; }
+  .v-B .actions button { border: 1px solid #26343a; background: #131a1e; color: #a9c3c9; border-radius: 7px; font-size: 11px; padding: 5px 9px; cursor: pointer; }
+  .v-B .srclist { margin-top: 12px; border-top: 1px solid #212a30; padding-top: 9px; }
+  .v-B .srclist .h { font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: #7d949c; margin-bottom: 6px; }
+  .v-B .src { display: flex; gap: 9px; align-items: flex-start; padding: 5px 0; font-size: 12px; }
+  .v-B .src .n { width: 16px; height: 16px; border-radius: 4px; background: #1d2a2e; display: grid; place-items: center; font-size: 9px; color: #9fe8d3; flex: 0 0 16px; }
+  .v-B .src .d { color: #7d949c; font-size: 10.5px; }
+  .v-B .cost { font-size: 10.5px; color: #6c828a; margin-top: 10px; }
+  .v-B .composerwrap { background: #0c0f11; border-top: 1px solid #1e262b; }
+  .v-B .composer { background: #171d21; border: 1px solid #26343a; border-radius: 14px; }
+  .v-B .add { background: #1d2a2e; color: #9fe8d3; }
+  .v-B .record { background: #9fe8d3; color: #10181a; }
+
+  /* ---------- reference: C · dense rail ---------- */
+  .v-C { background: #121212; color: #e6e6e6; font-family: -apple-system, sans-serif; }
+  .v-C .statusbar { opacity: .6; }
+  .v-C .header { padding: 0 8px 8px; border-bottom: 1px solid #232323; }
+  .v-C .pillbtn { background: transparent; border-color: #2e2e2e; color: #e6e6e6; border-radius: 7px; font-family: ui-monospace, monospace; font-size: 11px; }
+  .v-C .scroll { padding: 0; }
+  .v-C .row { display: grid; grid-template-columns: 58px 1fr; border-bottom: 1px solid #1d1d1d; }
+  .v-C .rail { padding: 10px 6px 10px 10px; font: 9px/1.45 ui-monospace, monospace; color: #6f6f6f; border-right: 1px solid #1d1d1d; }
+  .v-C .rail .m { color: #e8a33d; font-weight: 700; display: block; margin-bottom: 4px; }
+  .v-C .content { padding: 10px 12px; font-size: 13px; line-height: 1.55; }
+  .v-C .tool { margin: 8px 0; font: 10.5px/1.5 ui-monospace, monospace; color: #9a9a9a; }
+  .v-C .tool b { color: #e8a33d; font-weight: 600; }
+  .v-C .artifact { display: flex; gap: 9px; align-items: center; border: 1px solid #2b2b2b; border-radius: 6px; padding: 8px 9px; margin: 9px 0; }
+  .v-C .artifact .thumb { width: 30px; height: 22px; border-radius: 3px; background: repeating-linear-gradient(90deg,#3a2a12,#3a2a12 2px,#241a0d 2px,#241a0d 4px); }
+  .v-C .artifact .t { font-size: 12px; font-weight: 600; }
+  .v-C .artifact .s { font-size: 10px; color: #8a8a8a; }
+  .v-C .actions { display: flex; align-items: center; gap: 10px; margin-top: 10px; color: #8a8a8a; }
+  .v-C .actions button { background: none; border: 1px solid #2b2b2b; color: #b9b9b9; border-radius: 5px; padding: 3px 7px; font: 10.5px ui-monospace, monospace; cursor: pointer; display: grid; place-items: center; }
+  .v-C .srcline { display: flex; align-items: center; gap: 6px; margin-top: 8px; font: 10.5px ui-monospace, monospace; color: #e8a33d; cursor: pointer; }
+  .v-C .composerwrap { border-top: 1px solid #232323; }
+  .v-C .composer { background: #191919; border-radius: 8px; border: 1px solid #262626; }
+  .v-C .add { background: #232323; color: #ddd; }
+  .v-C .record { background: #e8a33d; color: #1a1206; }
+
+  /* shared empty + drawer */
+  .empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center; gap: 6px; }
+  .mark { width: 44px; height: 44px; opacity: .9; }
+  .empty h1 { font-size: 24px; font-weight: 500; margin: 14px 0 0; letter-spacing: -.01em; }
+  .v-B .empty h1 { font-size: 20px; font-weight: 600; }
+  .v-C .empty h1 { font: 500 18px ui-monospace, monospace; }
+  .taskchips { display: flex; gap: 8px; margin-top: 22px; flex-wrap: wrap; justify-content: center; }
+  .taskchips .tc { display: inline-flex; align-items: center; gap: 6px; border: 1px solid rgba(255,255,255,.14); border-radius: 999px; padding: 8px 12px; font-size: 12px; opacity: .85; }
+  .v-C .taskchips .tc { border-radius: 6px; font-family: ui-monospace, monospace; font-size: 11px; }
+
+  .drawer { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .drawer .dt { font-size: 26px; font-weight: 500; padding: 6px 18px 14px; }
+  .v-B .drawer .dt, .v-C .drawer .dt { font-size: 18px; font-weight: 600; padding: 6px 16px 10px; }
+  .search { margin: 0 14px 12px; display: flex; align-items: center; gap: 8px; padding: 9px 11px; border-radius: 10px; font-size: 12px; }
+  .v-A .search { background: #262220; color: #a99f92; border-radius: 999px; }
+  .v-B .search { background: #171d21; border: 1px solid #26343a; color: #7d949c; }
+  .v-C .search { background: #191919; border: 1px solid #262626; color: #8a8a8a; border-radius: 6px; font-family: ui-monospace, monospace; font-size: 11px; }
+  .dnav { padding: 0 10px 8px; }
+  .dnav .item { display: flex; align-items: center; gap: 12px; padding: 10px 8px; font-size: 14px; border-radius: 8px; }
+  .dnav .item .ic { opacity: .7; }
+  .v-C .dnav .item { font: 12px ui-monospace, monospace; padding: 8px; }
+  .dsec { padding: 6px 20px 4px; font: 600 10px/2 -apple-system, sans-serif; letter-spacing: .1em; text-transform: uppercase; opacity: .45; }
+  .recents { flex: 1; overflow-y: auto; padding: 0 10px; }
+  .recents .r { padding: 9px 8px; font-size: 14px; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .v-C .recents .r { font-family: ui-monospace, monospace; font-size: 11.5px; border-bottom: 1px solid #1d1d1d; }
+  .dacct { display: flex; align-items: center; gap: 10px; padding: 12px 16px 18px; }
+  .dacct .av { width: 28px; height: 28px; border-radius: 50%; background: #b45309; color: #fff; display: grid; place-items: center; font-size: 11px; font-weight: 700; }
+  .dacct .nm { font-size: 13px; }
+  .dacct .more { margin-left: auto; opacity: .6; }
+
+  /* overlays */
+  .scrim { position: absolute; inset: 0; background: rgba(0,0,0,.55); }
+  .sheet { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 18px 18px 0 0; padding: 12px 16px 22px; max-height: 62%; overflow-y: auto; }
+  .v-A .sheet { background: #201c19; }
+  .v-B .sheet { background: #171d21; border-top: 1px solid #26343a; }
+  .v-C .sheet { background: #181818; border-top: 1px solid #2b2b2b; border-radius: 0; }
+  .sheet .sh { display: grid; grid-template-columns: 28px 1fr 28px; align-items: center; margin-bottom: 10px; }
+  .sheet .sh b { text-align: center; font-size: 13px; font-weight: 600; }
+  .sheet .sh button { background: none; border: 0; color: inherit; opacity: .7; cursor: pointer; display: grid; place-items: center; }
+  .sheet .row-src { padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,.08); }
+  .sheet .row-src .t { font-size: 13px; }
+  .sheet .row-src .d { display: flex; align-items: center; gap: 6px; font-size: 11px; opacity: .6; margin-top: 4px; }
+  .sheet .row-src .mono { width: 14px; height: 14px; border-radius: 50%; display: grid; place-items: center; font-size: 8px; font-weight: 700; background: #333; font-family: -apple-system, sans-serif; }
+  .menu { position: absolute; right: 10px; top: 92px; width: 216px; border-radius: 12px; padding: 6px; }
+  .v-A .menu { background: #262220; box-shadow: 0 12px 30px rgba(0,0,0,.5); }
+  .v-B .menu { background: #171d21; border: 1px solid #26343a; }
+  .v-C .menu { background: #191919; border: 1px solid #2b2b2b; border-radius: 8px; }
+  .menu .mh { font-size: 11px; opacity: .5; padding: 6px 8px 8px; border-bottom: 1px solid rgba(255,255,255,.08); margin-bottom: 4px; }
+  .menu .mi { display: flex; align-items: center; gap: 10px; padding: 9px 8px; font-size: 13px; border-radius: 7px; }
+  .menu .mi.danger { color: #f87171; }
+  .menu .mi .sw { margin-left: auto; width: 26px; height: 15px; border-radius: 999px; background: #000; opacity: .55; position: relative; }
+  .menu .mi .sw::after { content: ""; position: absolute; right: 2px; top: 2px; width: 11px; height: 11px; border-radius: 50%; background: #8d8378; }
+
+  /* switcher */
+  .switcher {
+    position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 10px; z-index: 50;
+    background: #f5efe6; color: #17130f; border-radius: 999px; padding: 7px 9px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.5); font-size: 12px; font-weight: 600;
+  }
+  .switcher button { border: 0; background: #17130f; color: #f5efe6; width: 26px; height: 26px; border-radius: 50%; cursor: pointer; font-size: 13px; display: grid; place-items: center; }
+  .switcher .lbl { min-width: 178px; text-align: center; }
+  .switcher .screens { display: flex; gap: 3px; margin-left: 6px; border-left: 1px solid rgba(0,0,0,.15); padding-left: 8px; }
+  .switcher .screens span { padding: 4px 8px; border-radius: 999px; cursor: pointer; font-weight: 500; opacity: .5; }
+  .switcher .screens span.on { background: #17130f; color: #f5efe6; opacity: 1; }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div class="tag">Prototype · locked direction</div>
+    <div class="phone">
+      <div class="viewport" id="viewport"></div>
+    </div>
+    <div class="note">
+      <b>A · Canvas is the locked direction.</b> Revised: SVG icons only (no emoji),
+      Think/Search toggles in the composer, one record button, model attribution moved to
+      the cost line at the end, composer pinned to the bottom.
+      <br><br>
+      <code>← →</code> variant (B and C kept for reference) · <code>↑ ↓</code> screen · <code>Esc</code> closes overlays.
+    </div>
+  </div>
+
+  <div class="switcher">
+    <button id="prev">←</button>
+    <div class="lbl" id="lbl">A · Canvas (locked)</div>
+    <button id="next">→</button>
+    <div class="screens" id="screens">
+      <span data-s="chat">chat</span><span data-s="empty">empty</span><span data-s="drawer">drawer</span>
+    </div>
+  </div>
+
+<script>
+/* ---------- icon set: inline SVG, no emoji ---------- */
+const ICONS = {
+  menu:    '<path d="M4 7h16M4 12h16M4 17h16"/>',
+  more:    '<circle cx="5.5" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="18.5" cy="12" r="1.5" fill="currentColor" stroke="none"/>',
+  plus:    '<path d="M12 5v14M5 12h14"/>',
+  record:  '<circle cx="12" cy="12" r="8.4"/><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/>',
+  copy:    '<rect x="9" y="9" width="11" height="11" rx="2.2"/><path d="M15 5.5H6.5A1.5 1.5 0 0 0 5 7v8.5"/>',
+  regen:   '<path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.8 4.2v5h-5"/>',
+  play:    '<path d="M8.5 5.2 19 12 8.5 18.8z"/>',
+  search:  '<circle cx="11" cy="11" r="6.4"/><path d="M15.8 15.8 20 20"/>',
+  close:   '<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>',
+  pin:     '<path d="M9 4h6l-.8 5.4 3.8 3.6H6l3.8-3.6z"/><path d="M12 13v7"/>',
+  pencil:  '<path d="M4.5 19.5h4L20 8l-4-4L4.5 15.5z"/>',
+  trash:   '<path d="M5 7h14M10 7V4.5h4V7M7.5 7l.9 12.5h7.2L16.5 7"/>',
+  mute:    '<path d="M4.5 9.5v5h3.6l4.4 3.5V6L8.1 9.5z"/><path d="M16.5 9.5l4 5M20.5 9.5l-4 5"/>',
+  folder:  '<path d="M3.5 7.5h6l1.8 2H20.5v9H3.5z"/>',
+  bubble:  '<path d="M20.5 11.6a7.6 7.6 0 0 1-7.6 7.6H8l-4 2.6v-5.1a7.6 7.6 0 1 1 16.5-5.1z"/>',
+  layers:  '<path d="M12 3.5 20.5 8 12 12.5 3.5 8z"/><path d="M3.5 12.5 12 17l8.5-4.5"/>',
+  attach:  '<path d="M9 12.5 15.5 6a3 3 0 0 1 4.2 4.2l-8 8a5 5 0 0 1-7-7l7.6-7.6"/>',
+  slides:  '<rect x="3.5" y="5" width="17" height="11" rx="1.4"/><path d="M12 16v3.5M8 21h8"/>',
+  think:   '<path d="M12 4.5v15M4.5 12h15M7 7l10 10M17 7 7 17"/>',
+  chevron: '<path d="M9 6l6 6-6 6"/>'
+};
+function ic(name, size = 18, stroke = 1.7) {
+  return `<svg class="ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" stroke-width="${stroke}" stroke-linecap="round" stroke-linejoin="round"
+    aria-hidden="true">${ICONS[name] || ""}</svg>`;
+}
+
+const VARIANTS = { A: "Canvas (locked)", B: "Cards (ref)", C: "Dense rail (ref)" };
+let variant = "A";
+let screen = "chat";
+let sourcesOpen = false;
+let menuOpen = false;
+let thoughtOpen = false;
+
+const SOURCES = [
+  { t: "Q4 roadmap — internal draft", d: "notion.so" },
+  { t: "Pricing changes for Q4", d: "linear.app" },
+  { t: "Deck template guidelines", d: "slidesgo.com" },
+];
+const COST = { model: "Sonnet 4.5 · High", tokens: "2,148 in / 412 out", usd: "$0.02" };
+
+function statusbar() {
+  return `<div class="statusbar"><span>12:31</span><span>▮▮▮ ⌁ 38</span></div>`;
+}
+
+function header() {
+  return `<div class="header">
+    <button class="iconbtn ping" title="Menu">${ic("menu", 19)}</button>
+    <button class="pillbtn">Sonnet 4.5 <span class="dim">· High</span></button>
+    <button class="iconbtn pmenu" title="Session menu" onclick="toggleMenu()">${ic("more", 19)}</button>
+  </div>`;
+}
+
+function composer() {
+  const chips = variant === "A"
+    ? `<div class="modes">
+         <button class="mchip on">${ic("think", 12, 2)} Think</button>
+         <button class="mchip">${ic("search", 12, 2)} Search</button>
+       </div>`
+    : "";
+  return `<div class="composerwrap">
+    <div class="composer">
+      ${chips}
+      <div class="inputline">
+        <button class="roundbtn add">${ic("plus", 18)}</button>
+        <div class="input">Reply or hold to talk</div>
+        <button class="roundbtn record">${ic("record", 18)}</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function sourcesSheet() {
+  if (!sourcesOpen) return "";
+  const rows = SOURCES.map(s => `
+    <div class="row-src">
+      <div class="t">${s.t}</div>
+      <div class="d"><span class="mono">${s.d[0].toUpperCase()}</span>${s.d}</div>
+    </div>`).join("");
+  return `<div class="scrim" onclick="toggleSources()"></div>
+    <div class="sheet">
+      <div class="sh"><button onclick="toggleSources()">${ic("close", 16)}</button><b>Sources</b><span></span></div>
+      ${rows}
+    </div>`;
+}
+
+function menu() {
+  if (!menuOpen) return "";
+  return `<div class="menu">
+      <div class="mh">Q4 roadmap deck for Monday</div>
+      <div class="mi">${ic("mute", 15)} Mute <span class="sw"></span></div>
+      <div class="mi">${ic("pencil", 15)} Rename</div>
+      <div class="mi">${ic("pin", 15)} Pin</div>
+      <div class="mi">${ic("folder", 15)} Add to project</div>
+      <div class="mi danger">${ic("trash", 15)} Delete</div>
+    </div>`;
+}
+
+/* ---------- chat ---------- */
+function chatA() {
+  return `<div class="transcript">
+    <div class="msg user">Turn the Q4 roadmap doc into a 6-slide deck for Monday.</div>
+    <div class="thought ${thoughtOpen ? "open" : ""}">
+      <div class="thead" onclick="toggleThought()">
+        ${ic("chevron", 12, 2.2)}
+        <span>Thought · 1 tool · 1 document read</span>
+      </div>
+      ${thoughtOpen ? `<div class="thoughtbody">
+        <div class="reason">The roadmap has twelve pages and two unresolved decisions. I'll map one
+          theme per slide, keep the numbers exactly as written, and drop the staffing detail
+          because it isn't in the decisions you owe.</div>
+        <div class="trow"><span class="io">read</span><b>read_document</b><span>q4-roadmap.docx · pages 1–12</span></div>
+        <div class="trow"><span class="io">wrote</span><b>create_presentation</b><span>6 slides · v1</span></div>
+      </div>` : ""}
+    </div>
+    <div class="msg">Here's the deck: one slide per roadmap theme, plus a closing slide on the
+      two decisions you still owe. I kept the numbers from the doc and cut the staffing detail.</div>
+    <div class="artifact">
+      <div class="thumb"></div>
+      <div><div class="t">Q4 Roadmap — 6 slides</div><div class="s">deck · v1 · generated just now</div></div>
+    </div>
+    <div class="msg">Slide 3 is the risk call. If you want it softer, say so and I'll re-cut that
+      slide only rather than regenerate the deck.</div>
+    <div class="actions">
+      <button title="Copy">${ic("copy", 16)}</button>
+      <button title="Regenerate">${ic("regen", 16)}</button>
+      <button title="Read aloud">${ic("play", 16)}</button>
+      <button class="sources" onclick="toggleSources()">
+        <span class="stack">
+          <span class="dot" style="background:#4f7cff">N</span>
+          <span class="dot" style="background:#6b5bd2">L</span>
+          <span class="dot" style="background:#3aa675">S</span>
+        </span>${SOURCES.length} sources</button>
+    </div>
+    <div class="cost">${COST.model} · ${COST.tokens} · ${COST.usd}</div>
+    <div class="disclaimer">AI can make mistakes. Check generated files before sharing.</div>
+  </div>`;
+}
+
+function chatB() {
+  return `<div class="transcript">
+    <div class="bubble user">
+      <div class="meta"><span>You</span><span class="spacer"></span><span>12:28</span></div>
+      <div class="body">Turn the Q4 roadmap doc into a 6-slide deck for Monday.</div>
+    </div>
+    <div class="bubble">
+      <div class="meta"><span class="m">Sonnet 4.5</span><span>· High</span><span class="spacer"></span><span>12:29</span></div>
+      <div class="tool">read_document → q4-roadmap.docx · 12 pages</div>
+      <div class="body">Here's the deck: one slide per roadmap theme, plus a closing slide on the
+        two decisions you still owe. Numbers are unchanged from the doc.</div>
+      <div class="artifact">
+        <div class="thumb"></div>
+        <div><div class="t">Q4 Roadmap — 6 slides</div><div class="s">deck · v1 · just now</div></div>
+      </div>
+      <div class="body">Slide 3 is the risk call. Want it softer? I'll re-cut that slide only.</div>
+      <div class="actions"><button>Copy</button><button>Regenerate</button><button>Read aloud</button></div>
+      <div class="srclist">
+        <div class="h">Sources · 3</div>
+        ${SOURCES.map((s,i)=>`<div class="src"><span class="n">${i+1}</span><div>${s.t}<div class="d">${s.d}</div></div></div>`).join("")}
+      </div>
+      <div class="cost">${COST.model} · ${COST.tokens} · ${COST.usd}</div>
+    </div>
+  </div>`;
+}
+
+function chatC() {
+  return `<div class="transcript">
+    <div class="row">
+      <div class="rail"><span class="m">YOU</span>12:28</div>
+      <div class="content">Turn the Q4 roadmap doc into a 6-slide deck for Monday.</div>
+    </div>
+    <div class="row">
+      <div class="rail"><span class="m">S4.5</span>12:29<br>2.1k in<br>412 out<br>$0.02</div>
+      <div class="content">
+        <div class="tool"><b>read_document</b> q4-roadmap.docx · 12 pages</div>
+        Here's the deck: one slide per roadmap theme, plus a closing slide on the two decisions you still owe.
+        <div class="artifact">
+          <div class="thumb"></div>
+          <div><div class="t">Q4 Roadmap — 6 slides</div><div class="s">deck · v1 · just now</div></div>
+        </div>
+        Slide 3 is the risk call. Want it softer? I'll re-cut that slide only.
+        <div class="actions"><button>${ic("copy",14)}</button><button>${ic("regen",14)}</button><button>${ic("play",14)}</button></div>
+        <div class="srcline" onclick="toggleSources()">${ic("chevron",13)} ${SOURCES.length} sources</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function markSvg() {
+  return `<svg class="mark" viewBox="0 0 44 44" fill="none" aria-hidden="true">
+    <path d="M22 6v32M6 22h32M10.7 10.7l22.6 22.6M33.3 10.7L10.7 33.3" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+  </svg>`;
+}
+
+function emptyScreen() {
+  const h1 = variant === "A" ? "What shall we think through?"
+    : variant === "B" ? "Hi Advay, what are we building?"
+    : "PROJECTX — new session";
+  const sub = variant === "C" ? `<div class="sub" style="opacity:.55;font-size:12px">local-first · your key · your model</div>` : "";
+  return `<div class="empty">
+    ${markSvg()}
+    <h1>${h1}</h1>
+    ${sub}
+    <div class="taskchips">
+      <span class="tc">${ic("folder", 14)} New project</span>
+      <span class="tc">${ic("slides", 14)} Slides</span>
+      <span class="tc">${ic("attach", 14)} Attach a doc</span>
+    </div>
+  </div>`;
+}
+
+function drawerScreen() {
+  const nav = `<div class="dnav">
+     <div class="item">${ic("bubble", 17)} Chats</div>
+     <div class="item">${ic("folder", 17)} Projects</div>
+     <div class="item">${ic("layers", 17)} Artifacts</div>
+   </div>`;
+  const recents = ["Q4 roadmap deck for Monday", "Pricing page rewrite", "Meta hackathon ideas",
+    "Reading the lease", "Spreadsheet of vendors", "Deck for the board"];
+  return `<div class="drawer">
+    <div class="statusbar"><span>12:31</span><span>▮▮▮ ⌁ 38</span></div>
+    <div class="dt">ProjectX</div>
+    <div class="search">${ic("search", 15)} Search chats…</div>
+    ${nav}
+    <div class="dsec">Recents</div>
+    <div class="recents">${recents.map(r=>`<div class="r">${r}</div>`).join("")}</div>
+    <div class="dacct"><span class="av">A</span><span class="nm">Advay</span><span class="more">${ic("more", 17)}</span></div>
+  </div>`;
+}
+
+function render() {
+  const vp = document.getElementById("viewport");
+  vp.className = "viewport v-" + variant;
+  const body = variant === "A" ? chatA() : variant === "B" ? chatB() : chatC();
+  if (screen === "drawer") {
+    vp.innerHTML = drawerScreen();
+  } else if (screen === "empty") {
+    vp.innerHTML = `${statusbar()}${header()}<div class="empty">${emptyScreen()}</div>${composer()}`;
+  } else {
+    vp.innerHTML = `${statusbar()}${header()}<div class="scroll">${body}</div>${composer()}${menu()}${sourcesSheet()}`;
+  }
+  document.getElementById("lbl").textContent = `${variant} · ${VARIANTS[variant]}`;
+  document.querySelectorAll("#screens span").forEach(el =>
+    el.classList.toggle("on", el.dataset.s === screen));
+  history.replaceState(null, "", `#${variant}/${screen}`);
+}
+
+function toggleSources() { sourcesOpen = !sourcesOpen; if (sourcesOpen) menuOpen = false; render(); }
+function toggleMenu() { menuOpen = !menuOpen; if (menuOpen) sourcesOpen = false; render(); }
+function toggleThought() { thoughtOpen = !thoughtOpen; render(); }
+function cycle(delta) {
+  const keys = Object.keys(VARIANTS);
+  variant = keys[(keys.indexOf(variant) + delta + keys.length) % keys.length];
+  sourcesOpen = false; menuOpen = false; render();
+}
+function setScreen(s) { screen = s; sourcesOpen = false; menuOpen = false; render(); }
+
+document.getElementById("prev").onclick = () => cycle(-1);
+document.getElementById("next").onclick = () => cycle(1);
+document.querySelectorAll("#screens span").forEach(el => el.onclick = () => setScreen(el.dataset.s));
+window.addEventListener("keydown", (e) => {
+  const t = e.target;
+  if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+  if (e.key === "ArrowLeft") cycle(-1);
+  if (e.key === "ArrowRight") cycle(1);
+  if (e.key === "ArrowUp") setScreen(screen === "chat" ? "empty" : screen === "empty" ? "drawer" : "chat");
+  if (e.key === "ArrowDown") setScreen(screen === "chat" ? "drawer" : screen === "drawer" ? "empty" : "chat");
+  if (e.key === "Escape") { sourcesOpen = false; menuOpen = false; render(); }
+});
+
+const initial = (location.hash || "#A/chat").slice(1).split("/");
+if (VARIANTS[initial[0]]) variant = initial[0];
+if (["chat", "empty", "drawer"].includes(initial[1])) screen = initial[1];
+render();
+</script>
+</body>
+</html>
