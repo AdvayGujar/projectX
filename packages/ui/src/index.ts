@@ -13,11 +13,17 @@ export type { IconName, IconProps } from "./icons";
 export { AddProviderSheet } from "./settings/AddProviderSheet";
 export type { AddProviderSheetProps, ProviderPresetSummary } from "./settings/AddProviderSheet";
 
+export { ConfirmDialog } from "./primitives/ConfirmDialog";
+export type { ConfirmDialogProps } from "./primitives/ConfirmDialog";
+
+export { ProviderMenu } from "./settings/ProviderMenu";
+export type { ProviderMenuProps } from "./settings/ProviderMenu";
+
 export { ProviderList } from "./settings/ProviderList";
 export type { ProviderListProps, ProviderSummary } from "./settings/ProviderList";
 
 export { ModelPickerSheet } from "./session/ModelPickerSheet";
-export type { ModelOption, ModelPickerSheetProps } from "./session/ModelPickerSheet";
+export type { ModelPickerSheetProps } from "./session/ModelPickerSheet";
 
 export { SessionHeader } from "./session/SessionHeader";
 export type { SessionHeaderProps } from "./session/SessionHeader";
@@ -36,8 +42,11 @@ export type { TranscriptProps } from "./session/Transcript";
 
 export { colors, HIT_SLOP, monoFont, radius, space, typography } from "./theme";
 
+export { REASONING_EFFORTS } from "./types";
 export type {
   DrawerDestination,
+  ModelOption,
+  ReasoningEffort,
   RecentSession,
   SourceRef,
   ToolActivity,

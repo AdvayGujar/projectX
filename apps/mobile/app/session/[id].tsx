@@ -1,4 +1,4 @@
-import type { ModelOption, SourceRef, ViewTurn } from "@projectx/ui";
+import type { SourceRef, ViewTurn } from "@projectx/ui";
 import {
   Composer,
   ModelPickerSheet,
@@ -11,20 +11,23 @@ import {
 import { useLocalSearchParams } from "expo-router";
 import * as Speech from "expo-speech";
 import type { ReactElement } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { findSession } from "../../src/fixtures/session";
 import { useOpenDrawer } from "../../src/navigation/useOpenDrawer";
-import { MODELS, useModelStore } from "../../src/state/modelStore";
+import { listAvailableModels } from "../../src/services/providerService";
+import { useModelStore } from "../../src/state/modelStore";
 
 export default function SessionScreen(): ReactElement {
   const params = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const openDrawer = useOpenDrawer();
+  const models = useModelStore((state) => state.models);
   const currentModel = useModelStore((state) => state.current);
   const selectModel = useModelStore((state) => state.select);
+  const setModels = useModelStore((state) => state.setModels);
 
   const fixture = findSession(params.id ?? "");
   const turns: readonly ViewTurn[] = fixture?.turns ?? [];
@@ -36,6 +39,10 @@ export default function SessionScreen(): ReactElement {
   const [menuOpen, setMenuOpen] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+
+  useEffect(() => {
+    void listAvailableModels().then(setModels);
+  }, [setModels]);
 
   const sources = useMemo<readonly SourceRef[]>(
     () => turns.flatMap((turn) => turn.sources ?? []),
@@ -62,20 +69,12 @@ export default function SessionScreen(): ReactElement {
     });
   }
 
-  function chooseModel(id: string): void {
-    const model: ModelOption | undefined = MODELS.find((option) => option.id === id);
-    if (model) {
-      selectModel(model);
-    }
-    setPickerOpen(false);
-  }
-
   return (
     <View style={styles.root}>
       <View style={{ paddingTop: insets.top }}>
         <SessionHeader
-          model={currentModel.label}
-          effort={currentModel.effort}
+          model={currentModel?.label ?? "Select model"}
+          effort={currentModel?.effort}
           onOpenDrawer={openDrawer}
           onOpenModelPicker={() => setPickerOpen(true)}
           onOpenMenu={() => setMenuOpen(true)}
@@ -131,9 +130,9 @@ export default function SessionScreen(): ReactElement {
 
       <ModelPickerSheet
         visible={pickerOpen}
-        models={MODELS}
-        selectedId={currentModel.id}
-        onSelect={chooseModel}
+        models={models}
+        selectedId={currentModel?.id ?? null}
+        onSelect={(model, effort) => selectModel(model, effort)}
         onClose={() => setPickerOpen(false)}
       />
     </View>

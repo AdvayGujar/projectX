@@ -6,7 +6,7 @@ import { colors, HIT_SLOP, radius, space, typography } from "../theme";
 
 export interface SessionHeaderProps {
   readonly model: string;
-  readonly effort: string;
+  readonly effort?: string;
   readonly onOpenDrawer: () => void;
   readonly onOpenModelPicker: () => void;
   readonly onOpenMenu?: () => void;
@@ -44,7 +44,7 @@ export function SessionHeader({
           style={styles.pill}
         >
           <Text style={styles.model}>{model}</Text>
-          <Text style={styles.effort}>· {effort}</Text>
+          {effort ? <Text style={styles.effort}>· {effort}</Text> : null}
         </Pressable>
       </View>
 

@@ -2,29 +2,29 @@ import type { ModelOption } from "@projectx/ui";
 import { create } from "zustand";
 
 /**
- * Placeholder model list. Real options come from `models_cache` once the provider
- * screens exist; the store shape should survive that swap.
+ * Models come from `models_cache`, filled when a provider key is validated. The store holds
+ * only the choice: which model answers, and at what effort (D11 — the user decides).
  */
-export const MODELS: readonly ModelOption[] = [
-  { id: "anthropic/claude-sonnet-4.5", label: "Sonnet 4.5", provider: "Anthropic", effort: "High" },
-  { id: "openai/gpt-5.1", label: "GPT-5.1", provider: "OpenAI", effort: "Medium" },
-  { id: "deepseek/deepseek-chat", label: "DeepSeek V3.2", provider: "DeepSeek", effort: "Standard" },
-  { id: "google/gemini-3-pro", label: "Gemini 3 Pro", provider: "Google", effort: "High" },
-];
-
-const DEFAULT_MODEL: ModelOption = MODELS[0] ?? {
-  id: "anthropic/claude-sonnet-4.5",
-  label: "Sonnet 4.5",
-  provider: "Anthropic",
-  effort: "High",
-};
-
 interface ModelState {
-  readonly current: ModelOption;
-  readonly select: (model: ModelOption) => void;
+  readonly models: readonly ModelOption[];
+  readonly current: ModelOption | null;
+  readonly setModels: (models: readonly ModelOption[]) => void;
+  readonly select: (model: ModelOption, effort: string) => void;
 }
 
 export const useModelStore = create<ModelState>((set) => ({
-  current: DEFAULT_MODEL,
-  select: (current) => set({ current }),
+  models: [],
+  current: null,
+  setModels: (models) =>
+    set((state) => {
+      const current =
+        state.current && models.some((model) => model.id === state.current?.id)
+          ? state.current
+          : (models[0] ?? null);
+      return { models, current };
+    }),
+  select: (model, effort) =>
+    set({
+      current: { ...model, effort },
+    }),
 }));

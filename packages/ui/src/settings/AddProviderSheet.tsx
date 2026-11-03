@@ -36,6 +36,7 @@ export function AddProviderSheet({
   const insets = useSafeAreaInsets();
   const [presetId, setPresetId] = useState(presets[0]?.id ?? "");
   const [apiKey, setApiKey] = useState("");
+  const [listOpen, setListOpen] = useState(false);
 
   const selected = presets.find((preset) => preset.id === presetId);
   const canSubmit = apiKey.trim().length > 0 && presetId.length > 0 && !busy;
@@ -59,24 +60,43 @@ export function AddProviderSheet({
 
           <ScrollView keyboardShouldPersistTaps="handled">
             <Text style={styles.sectionLabel}>Provider</Text>
-            <View style={styles.presets}>
-              {presets.map((preset) => {
-                const active = preset.id === presetId;
-                return (
-                  <Pressable
-                    key={preset.id}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: active }}
-                    onPress={() => setPresetId(preset.id)}
-                    style={[styles.preset, active ? styles.presetActive : undefined]}
-                  >
-                    <Text style={[styles.presetLabel, active ? styles.presetLabelActive : undefined]}>
-                      {preset.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Choose provider"
+              accessibilityState={{ expanded: listOpen }}
+              onPress={() => setListOpen((open) => !open)}
+              style={styles.select}
+            >
+              <Text style={styles.selectLabel}>{selected?.label ?? "Choose a provider"}</Text>
+              <View style={listOpen ? styles.selectChevronOpen : undefined}>
+                <Icon name="chevron" size={14} color={colors.textMuted} />
+              </View>
+            </Pressable>
+
+            {listOpen ? (
+              <View style={styles.dropdown}>
+                {presets.map((preset) => {
+                  const active = preset.id === presetId;
+                  return (
+                    <Pressable
+                      key={preset.id}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                      onPress={() => {
+                        setPresetId(preset.id);
+                        setListOpen(false);
+                      }}
+                      style={[styles.option, active ? styles.optionActive : undefined]}
+                    >
+                      <Text style={[styles.optionLabel, active ? styles.optionLabelActive : undefined]}>
+                        {preset.label}
+                      </Text>
+                      {active ? <Icon name="chevron" size={13} color={colors.text} /> : null}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : null}
 
             <Text style={styles.sectionLabel}>API key</Text>
             <TextInput
@@ -140,17 +160,39 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     color: colors.textFaint,
   },
-  presets: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  preset: {
+  select: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.14)",
-    borderRadius: radius.pill,
-    paddingVertical: 7,
+    borderRadius: radius.card,
+    backgroundColor: colors.canvas,
+    paddingVertical: 11,
     paddingHorizontal: space.md,
   },
-  presetActive: { backgroundColor: "rgba(255,255,255,0.10)", borderColor: "rgba(255,255,255,0.28)" },
-  presetLabel: { fontSize: typography.label, color: colors.textMuted },
-  presetLabelActive: { color: colors.text },
+  selectLabel: { fontSize: typography.label, color: colors.text },
+  selectChevronOpen: { transform: [{ rotate: "90deg" }] },
+  dropdown: {
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+    borderRadius: radius.card,
+    backgroundColor: colors.canvas,
+    overflow: "hidden",
+  },
+  option: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 10,
+    paddingHorizontal: space.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "rgba(255,255,255,0.08)",
+  },
+  optionActive: { backgroundColor: "rgba(255,255,255,0.06)" },
+  optionLabel: { fontSize: typography.label, color: colors.textMuted },
+  optionLabelActive: { color: colors.text },
   input: {
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.14)",

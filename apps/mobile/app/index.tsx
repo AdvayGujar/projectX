@@ -2,12 +2,13 @@ import type { EmptyAction } from "@projectx/ui";
 import { Composer, EmptyState, ModelPickerSheet, SessionHeader, colors } from "@projectx/ui";
 import { useRouter } from "expo-router";
 import type { ReactElement } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useOpenDrawer } from "../src/navigation/useOpenDrawer";
-import { MODELS, useModelStore } from "../src/state/modelStore";
+import { listAvailableModels } from "../src/services/providerService";
+import { useModelStore } from "../src/state/modelStore";
 
 const EMPTY_ACTIONS: readonly EmptyAction[] = [
   { key: "project", label: "New project", icon: "folder" },
@@ -21,13 +22,19 @@ export default function ChatsScreen(): ReactElement {
   const insets = useSafeAreaInsets();
   const openDrawer = useOpenDrawer();
   const router = useRouter();
+  const models = useModelStore((state) => state.models);
   const currentModel = useModelStore((state) => state.current);
   const selectModel = useModelStore((state) => state.select);
+  const setModels = useModelStore((state) => state.setModels);
 
   const [text, setText] = useState("");
   const [think, setThink] = useState(true);
   const [search, setSearch] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+
+  useEffect(() => {
+    void listAvailableModels().then(setModels);
+  }, [setModels]);
 
   function send(): void {
     if (text.trim().length === 0) {
@@ -48,19 +55,11 @@ export default function ChatsScreen(): ReactElement {
     );
   }
 
-  function chooseModel(id: string): void {
-    const model = MODELS.find((option) => option.id === id);
-    if (model) {
-      selectModel(model);
-    }
-    setPickerOpen(false);
-  }
-
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <SessionHeader
-        model={currentModel.label}
-        effort={currentModel.effort}
+        model={currentModel?.label ?? "Select model"}
+        effort={currentModel?.effort}
         onOpenDrawer={openDrawer}
         onOpenModelPicker={() => setPickerOpen(true)}
       />
@@ -82,9 +81,9 @@ export default function ChatsScreen(): ReactElement {
 
       <ModelPickerSheet
         visible={pickerOpen}
-        models={MODELS}
-        selectedId={currentModel.id}
-        onSelect={chooseModel}
+        models={models}
+        selectedId={currentModel?.id ?? null}
+        onSelect={(model, effort) => selectModel(model, effort)}
         onClose={() => setPickerOpen(false)}
       />
     </View>

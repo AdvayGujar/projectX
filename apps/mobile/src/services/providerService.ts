@@ -1,4 +1,5 @@
 import type { FetchLike, ModelInfo, ProviderRecord } from "@projectx/core";
+import type { ModelOption } from "@projectx/ui";
 import {
   AppError,
   createProviderConfig,
@@ -7,7 +8,7 @@ import {
 } from "@projectx/core";
 
 import { getDbContext } from "../db/client";
-import { newKeyRef, saveProviderKey } from "./keyStore";
+import { deleteProviderKey, newKeyRef, saveProviderKey } from "./keyStore";
 
 export interface AddProviderInput {
   readonly presetId: string;
@@ -67,4 +68,48 @@ export async function listProviders(): Promise<ProviderRecord[]> {
 export async function listModels(providerId: string): Promise<ModelInfo[]> {
   const context = await getDbContext();
   return createProviderRepository(context).listModels(providerId);
+}
+
+/**
+ * Removes the secret first: an orphaned row is recoverable, an orphaned key is not.
+ * `remove` clears the cached models in the same transaction as the row.
+ */
+export async function deleteProvider(providerId: string): Promise<void> {
+  const context = await getDbContext();
+  const repository = createProviderRepository(context);
+  const provider = await repository.get(providerId);
+  if (!provider) {
+    throw new AppError("db_not_found", `Provider ${providerId} not found`, {
+      userMessage: "That provider no longer exists.",
+    });
+  }
+  await deleteProviderKey(provider.keyRef);
+  await repository.remove(providerId);
+}
+
+/**
+ * Flattens every enabled provider's cached models into picker options. The id is prefixed
+ * with the provider row id because two providers can expose the same model slug.
+ */
+export async function listAvailableModels(): Promise<ModelOption[]> {
+  const context = await getDbContext();
+  const repository = createProviderRepository(context);
+  const providers = await repository.list();
+
+  const perProvider = await Promise.all(
+    providers
+      .filter((provider) => provider.enabled)
+      .map(async (provider) => {
+        const models = await repository.listModels(provider.id);
+        return models.map((model): ModelOption => ({
+          id: `${provider.id}:${model.id}`,
+          label: model.label,
+          provider: provider.label,
+          effort: model.capabilities.reasoning ? "Medium" : "Standard",
+          reasoning: model.capabilities.reasoning,
+        }));
+      }),
+  );
+
+  return perProvider.flat();
 }
