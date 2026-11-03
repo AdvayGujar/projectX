@@ -1,33 +1,18 @@
 import type { AttachmentChip, SourceRef } from "@projectx/ui";
-import {
-  Composer,
-  CostSummary,
-  ModelPickerSheet,
-  SessionHeader,
-  SessionMenu,
-  SourcesSheet,
-  Transcript,
-  colors,
-} from "@projectx/ui";
+import { ModelPickerSheet, SessionMenu, SourcesSheet, colors } from "@projectx/ui";
 import * as DocumentPicker from "expo-document-picker";
 import { useLocalSearchParams } from "expo-router";
 import * as Speech from "expo-speech";
 import type { ReactElement } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  type ScrollViewInstance,
-} from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useEffect, useMemo, useState } from "react";
+import { StyleSheet, View } from "react-native";
 
 import { useOpenDrawer } from "../../src/navigation/useOpenDrawer";
+import { SessionBody } from "../../src/screens/session/SessionBody";
+import { SessionComposerSection } from "../../src/screens/session/SessionComposerSection";
+import { SessionTopBar } from "../../src/screens/session/SessionTopBar";
 import { loadSession } from "../../src/services/sessionQueries";
-import { sendTurn } from "../../src/services/turnService";
+import { turnService } from "../../src/services/turnService";
 import { useModelCatalog } from "../../src/state/useModelCatalog";
 import { useModelStore } from "../../src/state/modelStore";
 import { useSessionStore } from "../../src/state/sessionStore";
@@ -35,7 +20,6 @@ import { useSessionStore } from "../../src/state/sessionStore";
 export default function SessionScreen(): ReactElement {
   const params = useLocalSearchParams<{ id: string }>();
   const sessionId = params.id ?? "";
-  const insets = useSafeAreaInsets();
   const openDrawer = useOpenDrawer();
 
   const models = useModelStore((state) => state.models);
@@ -60,7 +44,6 @@ export default function SessionScreen(): ReactElement {
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [attachments, setAttachments] = useState<readonly AttachmentChip[]>([]);
-  const scrollRef = useRef<ScrollViewInstance>(null);
 
   useEffect(() => {
     if (sessionId.length === 0 || activeSessionId === sessionId) {
@@ -94,8 +77,18 @@ export default function SessionScreen(): ReactElement {
     if (value.length === 0 || streaming) {
       return;
     }
+    if (!currentModel) {
+      setError("Choose a model before sending.");
+      return;
+    }
     setText("");
-    void sendTurn({ sessionId, text: value, think });
+    void turnService.send({
+      sessionId,
+      selectionId: currentModel.id,
+      effort: currentModel.effort,
+      text: value,
+      think,
+    });
   }
 
   async function attach(): Promise<void> {
@@ -132,61 +125,40 @@ export default function SessionScreen(): ReactElement {
 
   return (
     <View style={styles.root}>
-      <View style={{ paddingTop: insets.top }}>
-        <SessionHeader
-          model={currentModel?.label ?? "Select model"}
-          effort={currentModel?.effort}
-          onOpenDrawer={openDrawer}
-          onOpenModelPicker={() => setPickerOpen(true)}
-          onOpenMenu={() => setMenuOpen(true)}
-        />
-      </View>
+      <SessionTopBar
+        modelLabel={currentModel?.label ?? "Select model"}
+        effort={currentModel?.effort}
+        onOpenDrawer={openDrawer}
+        onOpenModelPicker={() => setPickerOpen(true)}
+        onOpenMenu={() => setMenuOpen(true)}
+      />
 
-      <ScrollView
-        ref={scrollRef}
-        style={styles.scroll}
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-        onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
-      >
-        {turns.length > 0 ? (
-          <Transcript
-            turns={turns}
-            onCopy={() => undefined}
-            onRegenerate={() => undefined}
-            onReadAloud={readAloud}
-            onOpenSources={() => setSourcesOpen(true)}
-          />
-        ) : (
-          <Text style={styles.missing}>
-            {error ?? (streaming ? "Thinking…" : "Send a message to start.")}
-          </Text>
-        )}
-        {error && turns.length > 0 ? <Text style={styles.error}>{error}</Text> : null}
-      </ScrollView>
+      <SessionBody
+        turns={turns}
+        error={error}
+        streaming={streaming}
+        onReadAloud={readAloud}
+        onOpenSources={() => setSourcesOpen(true)}
+      />
 
-      <CostSummary usage={usage} />
-
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <Composer
-          value={text}
-          placeholder="Reply or hold to talk"
-          think={think}
-          search={search}
-          attachments={attachments}
-          onRemoveAttachment={(id) =>
-            setAttachments((current) => current.filter((item) => item.id !== id))
-          }
-          onChangeText={setText}
-          onToggleThink={() => setThink((value) => !value)}
-          onToggleSearch={() => setSearch((value) => !value)}
-          onAttach={() => {
-            void attach();
-          }}
-          onSend={send}
-          onRecord={() => undefined}
-        />
-      </KeyboardAvoidingView>
+      <SessionComposerSection
+        text={text}
+        think={think}
+        search={search}
+        attachments={attachments}
+        usage={usage}
+        onChangeText={setText}
+        onToggleThink={() => setThink((value) => !value)}
+        onToggleSearch={() => setSearch((value) => !value)}
+        onAttach={() => {
+          void attach();
+        }}
+        onRemoveAttachment={(id) =>
+          setAttachments((current) => current.filter((item) => item.id !== id))
+        }
+        onSend={send}
+        onRecord={() => undefined}
+      />
 
       <SessionMenu
         visible={menuOpen}
@@ -215,19 +187,4 @@ export default function SessionScreen(): ReactElement {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.canvas },
-  scroll: { flex: 1 },
-  content: { paddingBottom: 8 },
-  missing: {
-    marginTop: 48,
-    textAlign: "center",
-    fontSize: 13,
-    color: colors.textMuted,
-  },
-  error: {
-    marginTop: 12,
-    paddingHorizontal: 18,
-    fontSize: 13,
-    lineHeight: 19,
-    color: colors.danger,
-  },
 });

@@ -6,6 +6,7 @@ import { Icon } from "../icons";
 import { colors, HIT_SLOP, radius, space, typography } from "../theme";
 import type { SourceRef, ViewTurn } from "../types";
 import { Markdown } from "../markdown/Markdown";
+import { costLine, streamingLabel, summarise } from "./format";
 import { Thought } from "./Thought";
 
 export interface TranscriptProps {
@@ -49,9 +50,7 @@ export function Transcript({
             ) : null}
 
             {turn.status === "streaming" && turn.text.length === 0 ? (
-              <Text style={styles.thinking}>
-                {turn.reasoningRequested === false ? "Generating…" : "Thinking…"}
-              </Text>
+              <Text style={styles.thinking}>{streamingLabel(turn.reasoningRequested)}</Text>
             ) : null}
 
             {turn.text.length > 0 ? <Markdown text={turn.text} /> : null}
@@ -138,25 +137,6 @@ function Actions({ turn, onCopy, onRegenerate, onReadAloud, onOpenSources }: Act
             <Text style={styles.disclaimer}>{DISCLAIMER}</Text>
     </>
   );
-}
-
-function summarise(turn: ViewTurn): string {
-  const activity = turn.activity ?? [];
-  const reads = activity.filter((item) => item.kind === "read").length;
-  const parts = ["Thought"];
-  if (activity.length > 0) {
-    parts.push(`${activity.length} tool${activity.length === 1 ? "" : "s"}`);
-  }
-  if (reads > 0) {
-    parts.push(`${reads} document${reads === 1 ? "" : "s"} read`);
-  }
-  return parts.join(" · ");
-}
-
-function costLine(cost: NonNullable<ViewTurn["cost"]>): string {
-  return [cost.model, cost.effort, cost.tokens, cost.usd]
-    .filter((part): part is string => Boolean(part))
-    .join(" · ");
 }
 
 function SourceDots({ sources }: { readonly sources: readonly SourceRef[] }): ReactElement {

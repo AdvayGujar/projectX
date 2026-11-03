@@ -12,7 +12,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "test": "echo \"no mobile tests yet\"",
+    "test": "jest",
     "lint": "echo \"lint not configured yet\""
   },
   "dependencies": {
@@ -51,7 +51,23 @@
     "zustand": "^5.0.16"
   },
   "devDependencies": {
+    "@jest/globals": "^30.5.2",
+    "@testing-library/react-native": "^14.1.0",
+    "@types/jest": "^30.0.0",
     "@types/react": "~19.3.0",
+    "jest": "^30.5.2",
+    "jest-expo": "~58.0.14",
+    "react-test-renderer": "19.3.0",
     "typescript": "~6.0.3"
+  },
+  "jest": {
+    "preset": "jest-expo",
+    "moduleNameMapper": {
+      "^@projectx/ui$": "<rootDir>/../../packages/ui/src/index.ts",
+      "^@projectx/core$": "<rootDir>/../../packages/core/src/index.ts"
+    },
+    "testMatch": [
+      "<rootDir>/**/__tests__/**/*.test.ts?(x)"
+    ]
   }
 }

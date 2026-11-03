@@ -10,19 +10,20 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "echo \"no ui tests yet\"",
+    "test": "vitest run",
     "lint": "echo \"lint not configured yet\""
   },
   "peerDependencies": {
     "react": "*",
-    "react-native": "*"
-  },
-  "dependencies": {
-    "react-native-safe-area-context": "^5.10.1",
-    "react-native-svg": "^15.16.0"
+    "react-native": "*",
+    "react-native-svg": "*",
+    "react-native-safe-area-context": "*"
   },
   "devDependencies": {
     "@types/react": "~19.3.0",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.5",
+    "react-native-svg": "^15.16.0",
+    "react-native-safe-area-context": "^5.10.1"
   }
 }

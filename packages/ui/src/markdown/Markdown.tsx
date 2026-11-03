@@ -2,30 +2,12 @@ import type { ReactElement } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { colors, monoFont, radius, space, typography } from "../theme";
-
-interface Segment {
-  readonly kind: "text" | "bold" | "italic" | "code" | "link";
-  readonly text: string;
-}
-
-type Block =
-  | { readonly kind: "paragraph"; readonly text: string }
-  | { readonly kind: "heading"; readonly level: number; readonly text: string }
-  | { readonly kind: "code"; readonly text: string }
-  | { readonly kind: "quote"; readonly text: string }
-  | { readonly kind: "list"; readonly ordered: boolean; readonly items: readonly string[] };
-
-const INLINE = /(\*\*[^*\n]+\*\*|\*[^*\n]+\*|`[^`\n]+`|\[[^\]\n]+\]\([^)\n]+\))/g;
-const HEADING = /^(#{1,3})\s+(.*)$/;
-const BULLET = /^\s*[-*+]\s+(.*)$/;
-const NUMBERED = /^\s*\d+[.)]\s+(.*)$/;
-const QUOTE = /^\s*>\s?(.*)$/;
-const FENCE = /^\s*```/;
+import type { Block, Segment } from "./parse";
+import { parseBlocks, parseInline } from "./parse";
 
 /**
- * Small first-party Markdown renderer for assistant text: headings, paragraphs, lists,
- * quotes, fenced code and inline bold/italic/code/links. Written for streaming, so an
- * unterminated fence still renders as code instead of flashing raw backticks.
+ * Small first-party Markdown renderer for assistant text. The parser is pure and tested;
+ * this file is only presentation.
  */
 export function Markdown({ text }: { readonly text: string }): ReactElement {
   const blocks = parseBlocks(text);
@@ -95,133 +77,6 @@ function styleFor(kind: Segment["kind"]) {
     default:
       return undefined;
   }
-}
-
-function parseInline(text: string): Segment[] {
-  const segments: Segment[] = [];
-  let lastIndex = 0;
-  for (const match of text.matchAll(INLINE)) {
-    const index = match.index ?? 0;
-    if (index > lastIndex) {
-      segments.push({ kind: "text", text: text.slice(lastIndex, index) });
-    }
-    segments.push(toSegment(match[0]));
-    lastIndex = index + match[0].length;
-  }
-  if (lastIndex < text.length) {
-    segments.push({ kind: "text", text: text.slice(lastIndex) });
-  }
-  return segments;
-}
-
-function toSegment(token: string): Segment {
-  if (token.startsWith("**")) {
-    return { kind: "bold", text: token.slice(2, -2) };
-  }
-  if (token.startsWith("`")) {
-    return { kind: "code", text: token.slice(1, -1) };
-  }
-  if (token.startsWith("[")) {
-    const split = token.indexOf("](");
-    return { kind: "link", text: token.slice(1, split) };
-  }
-  return { kind: "italic", text: token.slice(1, -1) };
-}
-
-function parseBlocks(text: string): Block[] {
-  const lines = text.split("\n");
-  const blocks: Block[] = [];
-  let index = 0;
-
-  while (index < lines.length) {
-    const line = lines[index] ?? "";
-
-    if (FENCE.test(line)) {
-      const code: string[] = [];
-      index += 1;
-      while (index < lines.length && !FENCE.test(lines[index] ?? "")) {
-        code.push(lines[index] ?? "");
-        index += 1;
-      }
-      index += 1;
-      blocks.push({ kind: "code", text: code.join("\n") });
-      continue;
-    }
-
-    if (line.trim().length === 0) {
-      index += 1;
-      continue;
-    }
-
-    const heading = HEADING.exec(line);
-    if (heading) {
-      blocks.push({ kind: "heading", level: (heading[1] ?? "#").length, text: heading[2] ?? "" });
-      index += 1;
-      continue;
-    }
-
-    const quote = QUOTE.exec(line);
-    if (quote) {
-      blocks.push({ kind: "quote", text: quote[1] ?? "" });
-      index += 1;
-      continue;
-    }
-
-    const bullet = BULLET.exec(line);
-    if (bullet) {
-      const parsed = collectList(lines, index, "bullet");
-      blocks.push({ kind: "list", ordered: false, items: parsed.items });
-      index = parsed.next;
-      continue;
-    }
-
-    const numbered = NUMBERED.exec(line);
-    if (numbered) {
-      const parsed = collectList(lines, index, "number");
-      blocks.push({ kind: "list", ordered: true, items: parsed.items });
-      index = parsed.next;
-      continue;
-    }
-
-    const paragraph: string[] = [];
-    while (index < lines.length) {
-      const current = lines[index] ?? "";
-      if (
-        current.trim().length === 0 ||
-        HEADING.test(current) ||
-        FENCE.test(current) ||
-        BULLET.test(current) ||
-        NUMBERED.test(current) ||
-        QUOTE.test(current)
-      ) {
-        break;
-      }
-      paragraph.push(current.trim());
-      index += 1;
-    }
-    blocks.push({ kind: "paragraph", text: paragraph.join(" ") });
-  }
-
-  return blocks;
-}
-
-function collectList(
-  lines: readonly string[],
-  start: number,
-  kind: "bullet" | "number",
-): { items: string[]; next: number } {
-  const pattern = kind === "bullet" ? BULLET : NUMBERED;
-  const items: string[] = [];
-  let index = start;
-  while (index < lines.length) {
-    const match = pattern.exec(lines[index] ?? "");
-    if (!match) {
-      break;
-    }
-    items.push(match[1] ?? "");
-    index += 1;
-  }
-  return { items, next: index };
 }
 
 const styles = StyleSheet.create({
