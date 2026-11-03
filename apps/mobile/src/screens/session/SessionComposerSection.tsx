@@ -1,0 +1,57 @@
+import type { AttachmentChip, SessionUsageSummary } from "@projectx/ui";
+import { Composer, CostSummary } from "@projectx/ui";
+import type { ReactElement } from "react";
+import { KeyboardAvoidingView, Platform } from "react-native";
+
+export interface SessionComposerSectionProps {
+  readonly text: string;
+  readonly think: boolean;
+  readonly search: boolean;
+  readonly attachments: readonly AttachmentChip[];
+  readonly usage: SessionUsageSummary;
+  readonly onChangeText: (value: string) => void;
+  readonly onToggleThink: () => void;
+  readonly onToggleSearch: () => void;
+  readonly onAttach: () => void;
+  readonly onRemoveAttachment: (id: string) => void;
+  readonly onSend: () => void;
+  readonly onRecord: () => void;
+}
+
+/** Bottom zone: session totals, then the pinned composer. */
+export function SessionComposerSection({
+  text,
+  think,
+  search,
+  attachments,
+  usage,
+  onChangeText,
+  onToggleThink,
+  onToggleSearch,
+  onAttach,
+  onRemoveAttachment,
+  onSend,
+  onRecord,
+}: SessionComposerSectionProps): ReactElement {
+  return (
+    <>
+      <CostSummary usage={usage} />
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <Composer
+          value={text}
+          placeholder="Reply or hold to talk"
+          think={think}
+          search={search}
+          attachments={attachments}
+          onChangeText={onChangeText}
+          onToggleThink={onToggleThink}
+          onToggleSearch={onToggleSearch}
+          onAttach={onAttach}
+          onRemoveAttachment={onRemoveAttachment}
+          onSend={onSend}
+          onRecord={onRecord}
+        />
+      </KeyboardAvoidingView>
+    </>
+  );
+}
