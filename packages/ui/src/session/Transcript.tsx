@@ -35,11 +35,11 @@ export function Transcript({
           </View>
         ) : (
           <View key={turn.id} style={styles.assistantRow}>
-            {turn.reasoning && turn.activity ? (
+            {turn.reasoning ? (
               <Thought
                 summary={summarise(turn)}
                 reasoning={turn.reasoning}
-                activity={turn.activity}
+                activity={turn.activity ?? []}
                 open={openThoughtId === turn.id}
                 onToggle={() =>
                   setOpenThoughtId((current) => (current === turn.id ? null : turn.id))
@@ -99,11 +99,7 @@ export function Transcript({
               ) : null}
             </View>
 
-            {turn.cost ? (
-              <Text style={styles.cost}>
-                {turn.cost.model} · {turn.cost.effort} · {turn.cost.tokens} · {turn.cost.usd}
-              </Text>
-            ) : null}
+            {turn.cost ? <Text style={styles.cost}>{costLine(turn.cost)}</Text> : null}
 
             <Text style={styles.disclaimer}>{DISCLAIMER}</Text>
           </View>
@@ -115,11 +111,21 @@ export function Transcript({
 
 function summarise(turn: ViewTurn): string {
   const activity = turn.activity ?? [];
-  const tools = activity.length;
   const reads = activity.filter((item) => item.kind === "read").length;
-  const toolLabel = `${tools} tool${tools === 1 ? "" : "s"}`;
-  const readLabel = `${reads} document${reads === 1 ? "" : "s"} read`;
-  return `Thought · ${toolLabel} · ${readLabel}`;
+  const parts = ["Thought"];
+  if (activity.length > 0) {
+    parts.push(`${activity.length} tool${activity.length === 1 ? "" : "s"}`);
+  }
+  if (reads > 0) {
+    parts.push(`${reads} document${reads === 1 ? "" : "s"} read`);
+  }
+  return parts.join(" · ");
+}
+
+function costLine(cost: NonNullable<ViewTurn["cost"]>): string {
+  return [cost.model, cost.effort, cost.tokens, cost.usd]
+    .filter((part): part is string => Boolean(part))
+    .join(" · ");
 }
 
 function SourceDots({ sources }: { readonly sources: readonly SourceRef[] }): ReactElement {

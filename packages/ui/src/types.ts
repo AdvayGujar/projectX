@@ -17,9 +17,9 @@ export interface SourceRef {
 
 export interface TurnCost {
   readonly model: string;
-  readonly effort: string;
+  readonly effort?: string;
   readonly tokens: string;
-  readonly usd: string;
+  readonly usd?: string;
 }
 
 export interface TurnArtifact {
