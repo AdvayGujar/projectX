@@ -75,7 +75,9 @@ export function ModelPickerSheet({
               hitSlop={HIT_SLOP}
               onPress={() => (pending ? setPending(null) : close())}
             >
-              <Icon name={pending ? "chevron" : "close"} size={16} color={colors.text} />
+              <View style={pending ? styles.backChevron : undefined}>
+                <Icon name={pending ? "chevron" : "close"} size={16} color={colors.text} />
+              </View>
             </Pressable>
             <Text style={styles.title}>{pending ? "Reasoning effort" : "Model"}</Text>
             <View style={styles.headSpacer} />
@@ -244,6 +246,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 13, fontWeight: "600", color: colors.text },
   headSpacer: { width: 16 },
   step: { flexShrink: 1 },
+  backChevron: { transform: [{ rotate: "180deg" }] },
   search: {
     flexDirection: "row",
     alignItems: "center",

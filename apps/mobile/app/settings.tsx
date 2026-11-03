@@ -95,7 +95,7 @@ async function toSummary(provider: ProviderRecord): Promise<ProviderSummary> {
   return {
     id: provider.id,
     label: provider.label,
-    presetLabel: preset?.label ?? provider.presetId,
+    presetLabel: preset && preset.label !== provider.label ? preset.label : "",
     modelCount: models.length,
     enabled: provider.enabled,
   };

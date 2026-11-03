@@ -36,10 +36,7 @@ export function ProviderList({ providers, onAdd, onSelect }: ProviderListProps):
           >
             <View style={styles.rowText}>
               <Text style={styles.label}>{provider.label}</Text>
-              <Text style={styles.meta}>
-                {provider.presetLabel} · {provider.modelCount} models
-                {provider.enabled ? "" : " · disabled"}
-              </Text>
+              <Text style={styles.meta}>{describe(provider)}</Text>
             </View>
             <Icon name="chevron" size={14} color={colors.textFaint} />
           </Pressable>
@@ -52,6 +49,12 @@ export function ProviderList({ providers, onAdd, onSelect }: ProviderListProps):
       </Pressable>
     </View>
   );
+}
+
+function describe(provider: ProviderSummary): string {
+  return [provider.presetLabel, `${provider.modelCount} models`, provider.enabled ? null : "disabled"]
+    .filter((part): part is string => Boolean(part))
+    .join(" · ");
 }
 
 const styles = StyleSheet.create({
