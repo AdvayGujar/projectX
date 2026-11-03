@@ -35,6 +35,8 @@ const noTools: ToolExecutor = {
 export interface SendTurnInput {
   readonly sessionId: string;
   readonly text: string;
+  /** The composer's Think toggle for this turn. */
+  readonly think: boolean;
 }
 
 /**
@@ -111,13 +113,21 @@ export async function sendTurn(input: SendTurnInput): Promise<void> {
             state.addTurn({ id: event.userMessageId ?? `user-${Date.now()}`, role: "user", text: input.text });
             break;
           case "message_started":
-            state.addTurn({ id: event.messageId, role: "assistant", text: "" });
+            state.addTurn({
+              id: event.messageId,
+              role: "assistant",
+              text: "",
+              status: "streaming",
+              reasoningRequested: input.think,
+            });
             break;
           case "text_delta":
             state.appendText(event.messageId, event.text);
             break;
           case "reasoning_delta":
-            state.appendReasoning(event.messageId, event.text);
+            if (input.think) {
+              state.appendReasoning(event.messageId, event.text);
+            }
             break;
           case "usage":
             state.setCost(event.messageId, costOf(event.usage, model, selection.effort));
@@ -139,7 +149,9 @@ export async function sendTurn(input: SendTurnInput): Promise<void> {
     store.setError(describe(failure));
   } finally {
     controller = null;
-    useSessionStore.getState().setStreaming(false);
+    const state = useSessionStore.getState();
+    state.settleStreaming();
+    state.setStreaming(false);
   }
 }
 

@@ -63,7 +63,7 @@ export default function ChatsScreen(): ReactElement {
       useSessionStore.getState().beginSession(sessionId, value.slice(0, 60), []);
       setText("");
       router.push({ pathname: "/session/[id]", params: { id: sessionId } });
-      void sendTurn({ sessionId, text: value });
+      void sendTurn({ sessionId, text: value, think });
     } catch {
       setError("Could not start the chat.");
     }

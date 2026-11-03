@@ -13,6 +13,7 @@ interface SessionState {
   readonly appendText: (id: string, text: string) => void;
   readonly appendReasoning: (id: string, text: string) => void;
   readonly setCost: (id: string, cost: TurnCost) => void;
+  readonly settleStreaming: () => void;
   readonly setStreaming: (value: boolean) => void;
   readonly setError: (message: string | null) => void;
 }
@@ -49,6 +50,13 @@ export const useSessionStore = create<SessionState>((set) => ({
 
   setCost: (id, cost) =>
     set((state) => ({ turns: update(state.turns, id, (turn) => ({ ...turn, cost })) })),
+
+  settleStreaming: () =>
+    set((state) => ({
+      turns: state.turns.map((turn) =>
+        turn.status === "streaming" ? { ...turn, status: "done" as const } : turn,
+      ),
+    })),
 
   setStreaming: (value) => set({ streaming: value }),
   setError: (message) => set({ error: message }),

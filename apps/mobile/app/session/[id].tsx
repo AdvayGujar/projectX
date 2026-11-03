@@ -12,7 +12,7 @@ import * as DocumentPicker from "expo-document-picker";
 import { useLocalSearchParams } from "expo-router";
 import * as Speech from "expo-speech";
 import type { ReactElement } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -20,6 +20,7 @@ import {
   StyleSheet,
   Text,
   View,
+  type ScrollViewInstance,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -57,6 +58,7 @@ export default function SessionScreen(): ReactElement {
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [attachments, setAttachments] = useState<readonly AttachmentChip[]>([]);
+  const scrollRef = useRef<ScrollViewInstance>(null);
 
   useEffect(() => {
     if (sessionId.length === 0 || activeSessionId === sessionId) {
@@ -91,7 +93,7 @@ export default function SessionScreen(): ReactElement {
       return;
     }
     setText("");
-    void sendTurn({ sessionId, text: value });
+    void sendTurn({ sessionId, text: value, think });
   }
 
   async function attach(): Promise<void> {
@@ -139,9 +141,11 @@ export default function SessionScreen(): ReactElement {
       </View>
 
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
+        onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
       >
         {turns.length > 0 ? (
           <Transcript
