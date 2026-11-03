@@ -4,11 +4,14 @@ import * as DocumentPicker from "expo-document-picker";
 import { useRouter } from "expo-router";
 import type { ReactElement } from "react";
 import { useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useOpenDrawer } from "../src/navigation/useOpenDrawer";
+import { createSession } from "../src/services/sessionQueries";
+import { sendTurn } from "../src/services/turnService";
 import { useModelCatalog } from "../src/state/useModelCatalog";
+import { useSessionStore } from "../src/state/sessionStore";
 import { useModelStore } from "../src/state/modelStore";
 
 const EMPTY_ACTIONS: readonly EmptyAction[] = [
@@ -16,8 +19,6 @@ const EMPTY_ACTIONS: readonly EmptyAction[] = [
   { key: "slides", label: "Slides", icon: "slides" },
   { key: "attach", label: "Attach a doc", icon: "attach" },
 ];
-
-const DEMO_SESSION_ID = "q4-roadmap";
 
 export default function ChatsScreen(): ReactElement {
   const insets = useSafeAreaInsets();
@@ -32,14 +33,40 @@ export default function ChatsScreen(): ReactElement {
   const [search, setSearch] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [attachments, setAttachments] = useState<readonly AttachmentChip[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useModelCatalog();
-
-  function send(): void {
-    if (text.trim().length === 0) {
+  async function send(): Promise<void> {
+    const value = text.trim();
+    const selection = currentModel;
+    if (value.length === 0 || !selection) {
+      if (!selection) {
+        setError("Add a provider and choose a model first.");
+      }
       return;
     }
-    router.push({ pathname: "/session/[id]", params: { id: DEMO_SESSION_ID } });
+    const separator = selection.id.indexOf(":");
+    if (separator <= 0) {
+      setError("That model selection is not usable. Pick it again.");
+      return;
+    }
+
+    setError(null);
+    try {
+      const sessionId = await createSession({
+        title: value.slice(0, 60),
+        providerId: selection.id.slice(0, separator),
+        modelId: selection.id.slice(separator + 1),
+      });
+      // Claim the store before navigating so the session screen renders the live turn
+      // instead of re-reading an empty session from disk.
+      useSessionStore.getState().beginSession(sessionId, value.slice(0, 60), []);
+      setText("");
+      router.push({ pathname: "/session/[id]", params: { id: sessionId } });
+      void sendTurn({ sessionId, text: value });
+    } catch {
+      setError("Could not start the chat.");
+    }
   }
 
   async function attach(): Promise<void> {
@@ -90,9 +117,13 @@ export default function ChatsScreen(): ReactElement {
         onAttach={() => {
           void attach();
         }}
-        onSend={send}
+        onSend={() => {
+          void send();
+        }}
         onRecord={() => undefined}
       />
+
+      {error ? <Text style={styles.error}>{error}</Text> : null}
 
       <ModelPickerSheet
         visible={pickerOpen}
@@ -107,4 +138,11 @@ export default function ChatsScreen(): ReactElement {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.canvas },
+  error: {
+    paddingHorizontal: 18,
+    paddingBottom: 8,
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.danger,
+  },
 });
