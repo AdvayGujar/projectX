@@ -13,6 +13,7 @@
     "lint": "pnpm -r --if-present lint",
     "test": "pnpm -r --if-present test",
     "ios": "pnpm --filter @projectx/mobile ios",
+    "ios:fast": "bash scripts/ios-fast.sh",
     "android": "bash scripts/run-android.sh",
     "clean": "bash scripts/clean.sh",
     "spike": "node spikes/node/run-all.mjs",
