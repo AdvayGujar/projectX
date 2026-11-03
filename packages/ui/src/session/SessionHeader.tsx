@@ -35,16 +35,18 @@ export function SessionHeader({
         <Icon name="menu" size={19} color={colors.text} />
       </Pressable>
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Model: ${model}, effort ${effort}`}
-        hitSlop={HIT_SLOP}
-        onPress={onOpenModelPicker}
-        style={styles.pill}
-      >
-        <Text style={styles.model}>{model}</Text>
-        <Text style={styles.effort}>· {effort}</Text>
-      </Pressable>
+      <View style={styles.center}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Model: ${model}, effort ${effort}`}
+          hitSlop={HIT_SLOP}
+          onPress={onOpenModelPicker}
+          style={styles.pill}
+        >
+          <Text style={styles.model}>{model}</Text>
+          <Text style={styles.effort}>· {effort}</Text>
+        </Pressable>
+      </View>
 
       {onOpenMenu ? (
         <Pressable
@@ -78,10 +80,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  center: { flex: 1, alignItems: "center", justifyContent: "center" },
   pill: {
-    flex: 1,
     flexDirection: "row",
-    alignSelf: "center",
     alignItems: "center",
     justifyContent: "center",
     gap: 4,
