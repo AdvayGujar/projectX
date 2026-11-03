@@ -10,6 +10,12 @@ export type { EmptyAction, EmptyStateProps } from "./empty/EmptyState";
 export { Icon, ICON_NAMES } from "./icons";
 export type { IconName, IconProps } from "./icons";
 
+export { AddProviderSheet } from "./settings/AddProviderSheet";
+export type { AddProviderSheetProps, ProviderPresetSummary } from "./settings/AddProviderSheet";
+
+export { ProviderList } from "./settings/ProviderList";
+export type { ProviderListProps, ProviderSummary } from "./settings/ProviderList";
+
 export { ModelPickerSheet } from "./session/ModelPickerSheet";
 export type { ModelOption, ModelPickerSheetProps } from "./session/ModelPickerSheet";
 
