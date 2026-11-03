@@ -99,23 +99,38 @@ placeholders from the locked design and should move to tokens when the palette i
 `turnService` is the only thing that runs a turn. A different engine means rewriting that one
 service and keeping its exported signature (`sendTurn`, `stopTurn`, `SendTurnInput`).
 
-## Where the seams are weak today
+## Extending without forking
 
-Listed honestly, because "modular" should mean measured, not claimed:
+**Turns.** `apps/mobile/src/services/turnPort.ts` defines a `TurnPort` (`send`, `stop`,
+`isRunning`) and a `TurnSink` (`onUserTurn`, `onAssistantStart`, `onText`, `onReasoning`,
+`onUsage`, `onSettled`, `onError`). The port resolves the provider, key and model, runs the
+engine, and reports through the sink. It imports no store and no React.
 
-1. **`turnService` writes to `sessionStore` directly.** A custom UI cannot reuse the transport
-   without adopting that store. The fix is a `TurnPort` interface (send, stop, subscribe) in
-   `apps/mobile/src/services`, with the store as one consumer. Not built.
-2. **Screens are the composition points, and `session/[id].tsx` is 233 lines.** Adding a
-   feature there is one line, but the file is close to its ceiling; it should be split into
-   header / transcript / composer sections before the next feature lands.
-3. **No test runner for `packages/ui` or `apps/mobile`.** Core has 74 Vitest tests; the UI and
-   the turn service have none. `pnpm test` currently prints "no tests yet" for both.
-4. **`packages/ui` depends directly on `react-native-svg` and `react-native-safe-area-context`**
-   rather than declaring them as peers. Correct for now, worth tightening when the package is
-   published or reused.
-5. **No `internal/` split yet.** Modules are folders inside one package rather than separate
-   packages, so the "only import the public entry" rule is enforced by review, not by structure.
+`services/turnService.ts` is the composition root: `createTurnPort(createSessionStoreSink())`.
+A different shell supplies its own sink instead of importing the app's stores.
+
+**Screens.** `app/session/[id].tsx` composes three sections from
+`src/screens/session/` — `SessionTopBar`, `SessionBody`, `SessionComposerSection` — and owns
+state plus the sheets. Adding a section means adding a component and one JSX line.
+
+**Tests.** Vitest runs in all three packages. Pure logic is extracted so it can be tested
+without a renderer: `packages/ui/src/markdown/parse.ts`, `packages/ui/src/session/format.ts`,
+`apps/mobile/src/services/turnMath.ts`, the stores.
+
+```
+pnpm test                                   # every package
+pnpm --filter @projectx/ui test             # one package
+```
+
+## Remaining weak seams
+
+1. **No `internal/` split yet.** Modules are folders inside one package, so "only import the
+   public entry" is enforced by review, not by structure.
+2. **`packages/ui` depends directly on `react-native-svg` and `react-native-safe-area-context`**
+   rather than declaring them as peers. Correct for now, worth tightening before the package
+   is published or reused.
+3. **React components are not rendered in tests.** Coverage is on pure logic, stores and the
+   port; screen-level behaviour is still verified by running the app.
 
 ## Conventions worth repeating
 
