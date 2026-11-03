@@ -1,5 +1,5 @@
 import type { ReactElement } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -34,11 +34,23 @@ export function AddProviderSheet({
   onClose,
 }: AddProviderSheetProps): ReactElement {
   const insets = useSafeAreaInsets();
-  const [presetId, setPresetId] = useState(presets[0]?.id ?? "");
+  const [presetId, setPresetId] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [listOpen, setListOpen] = useState(false);
 
   const selected = presets.find((preset) => preset.id === presetId);
+
+  // Opening always starts clean: nothing selected, no key from a previous attempt.
+  // `presets` is rebuilt by the caller on every render, so it is deliberately not a
+  // dependency; only the open/close transition should reset the form.
+  useEffect(() => {
+    if (visible) {
+      setPresetId("");
+      setListOpen(false);
+    }
+    setApiKey("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
   const canSubmit = apiKey.trim().length > 0 && presetId.length > 0 && !busy;
 
   function close(): void {
