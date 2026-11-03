@@ -44,6 +44,7 @@ export { colors, HIT_SLOP, monoFont, radius, space, typography } from "./theme";
 
 export { REASONING_EFFORTS } from "./types";
 export type {
+  AttachmentChip,
   DrawerDestination,
   ModelOption,
   ReasoningEffort,

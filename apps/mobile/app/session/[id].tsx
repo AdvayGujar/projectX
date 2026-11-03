@@ -1,4 +1,4 @@
-import type { SourceRef, ViewTurn } from "@projectx/ui";
+import type { AttachmentChip, SourceRef, ViewTurn } from "@projectx/ui";
 import {
   Composer,
   ModelPickerSheet,
@@ -8,16 +8,17 @@ import {
   Transcript,
   colors,
 } from "@projectx/ui";
+import * as DocumentPicker from "expo-document-picker";
 import { useLocalSearchParams } from "expo-router";
 import * as Speech from "expo-speech";
 import type { ReactElement } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { findSession } from "../../src/fixtures/session";
 import { useOpenDrawer } from "../../src/navigation/useOpenDrawer";
-import { listAvailableModels } from "../../src/services/providerService";
+import { useModelCatalog } from "../../src/state/useModelCatalog";
 import { useModelStore } from "../../src/state/modelStore";
 
 export default function SessionScreen(): ReactElement {
@@ -27,7 +28,6 @@ export default function SessionScreen(): ReactElement {
   const models = useModelStore((state) => state.models);
   const currentModel = useModelStore((state) => state.current);
   const selectModel = useModelStore((state) => state.select);
-  const setModels = useModelStore((state) => state.setModels);
 
   const fixture = findSession(params.id ?? "");
   const turns: readonly ViewTurn[] = fixture?.turns ?? [];
@@ -39,15 +39,26 @@ export default function SessionScreen(): ReactElement {
   const [menuOpen, setMenuOpen] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [attachments, setAttachments] = useState<readonly AttachmentChip[]>([]);
 
-  useEffect(() => {
-    void listAvailableModels().then(setModels);
-  }, [setModels]);
+  useModelCatalog();
 
   const sources = useMemo<readonly SourceRef[]>(
     () => turns.flatMap((turn) => turn.sources ?? []),
     [turns],
   );
+
+  async function attach(): Promise<void> {
+    const result = await DocumentPicker.getDocumentAsync({
+      copyToCacheDirectory: true,
+      multiple: false,
+    });
+    const asset = result.assets?.[0];
+    if (result.canceled || !asset) {
+      return;
+    }
+    setAttachments((current) => [...current, { id: asset.uri, name: asset.name }]);
+  }
 
   function readAloud(turnId: string): void {
     if (muted) {
@@ -105,10 +116,14 @@ export default function SessionScreen(): ReactElement {
           placeholder="Reply or hold to talk"
           think={think}
           search={search}
+          attachments={attachments}
+          onRemoveAttachment={(id) => setAttachments((current) => current.filter((item) => item.id !== id))}
           onChangeText={setText}
           onToggleThink={() => setThink((value) => !value)}
           onToggleSearch={() => setSearch((value) => !value)}
-          onAttach={() => undefined}
+          onAttach={() => {
+            void attach();
+          }}
           onSend={() => setText("")}
           onRecord={() => undefined}
         />
