@@ -8,7 +8,7 @@ import {
 } from "@projectx/core";
 
 import { getDbContext } from "../db/client";
-import { newKeyRef, saveProviderKey } from "./keyStore";
+import { deleteProviderKey, newKeyRef, saveProviderKey } from "./keyStore";
 
 export interface AddProviderInput {
   readonly presetId: string;
@@ -68,6 +68,23 @@ export async function listProviders(): Promise<ProviderRecord[]> {
 export async function listModels(providerId: string): Promise<ModelInfo[]> {
   const context = await getDbContext();
   return createProviderRepository(context).listModels(providerId);
+}
+
+/**
+ * Removes the secret first: an orphaned row is recoverable, an orphaned key is not.
+ * `remove` clears the cached models in the same transaction as the row.
+ */
+export async function deleteProvider(providerId: string): Promise<void> {
+  const context = await getDbContext();
+  const repository = createProviderRepository(context);
+  const provider = await repository.get(providerId);
+  if (!provider) {
+    throw new AppError("db_not_found", `Provider ${providerId} not found`, {
+      userMessage: "That provider no longer exists.",
+    });
+  }
+  await deleteProviderKey(provider.keyRef);
+  await repository.remove(providerId);
 }
 
 /**

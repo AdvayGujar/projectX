@@ -1,7 +1,17 @@
 import type { ProviderRecord } from "@projectx/core";
 import { AppError, PRESETS } from "@projectx/core";
 import type { ProviderSummary } from "@projectx/ui";
-import { AddProviderSheet, Icon, ProviderList, colors, HIT_SLOP, radius, space } from "@projectx/ui";
+import {
+  AddProviderSheet,
+  ConfirmDialog,
+  Icon,
+  ProviderList,
+  ProviderMenu,
+  colors,
+  HIT_SLOP,
+  radius,
+  space,
+} from "@projectx/ui";
 import { useFocusEffect } from "expo-router";
 import type { ReactElement } from "react";
 import { useCallback, useState } from "react";
@@ -9,7 +19,14 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useOpenDrawer } from "../src/navigation/useOpenDrawer";
-import { addProvider, listModels, listProviders } from "../src/services/providerService";
+import {
+  addProvider,
+  deleteProvider,
+  listAvailableModels,
+  listModels,
+  listProviders,
+} from "../src/services/providerService";
+import { useModelStore } from "../src/state/modelStore";
 
 export default function SettingsScreen(): ReactElement {
   const insets = useSafeAreaInsets();
@@ -19,6 +36,9 @@ export default function SettingsScreen(): ReactElement {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [menuFor, setMenuFor] = useState<ProviderSummary | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<ProviderSummary | null>(null);
+  const setModels = useModelStore((state) => state.setModels);
 
   const reload = useCallback(async (): Promise<void> => {
     const records = await listProviders();
@@ -31,6 +51,21 @@ export default function SettingsScreen(): ReactElement {
       void reload();
     }, [reload]),
   );
+
+  async function confirmDelete(): Promise<void> {
+    if (!pendingDelete) {
+      return;
+    }
+    try {
+      await deleteProvider(pendingDelete.id);
+      await reload();
+      setModels(await listAvailableModels());
+    } catch (failure) {
+      setError(describe(failure));
+    } finally {
+      setPendingDelete(null);
+    }
+  }
 
   async function submit(input: { presetId: string; apiKey: string }): Promise<void> {
     setBusy(true);
@@ -68,7 +103,30 @@ export default function SettingsScreen(): ReactElement {
           setError(null);
           setSheetOpen(true);
         }}
-        onSelect={() => undefined}
+        onSelect={(id) => setMenuFor(providers.find((provider) => provider.id === id) ?? null)}
+      />
+
+      <ProviderMenu
+        visible={menuFor !== null}
+        label={menuFor?.label ?? ""}
+        detail={`${menuFor?.modelCount ?? 0} models · deleting removes the key from the keychain`}
+        onDelete={() => {
+          // Two modals cannot present at once on iOS; hand the menu over to the dialog.
+          setPendingDelete(menuFor);
+          setMenuFor(null);
+        }}
+        onClose={() => setMenuFor(null)}
+      />
+
+      <ConfirmDialog
+        visible={pendingDelete !== null}
+        title={`Delete ${pendingDelete?.label ?? "provider"}?`}
+        message="The key is removed from the keychain and the cached model list is deleted. Chats that used this provider are kept."
+        confirmLabel="Delete"
+        onConfirm={() => {
+          void confirmDelete();
+        }}
+        onCancel={() => setPendingDelete(null)}
       />
 
       <AddProviderSheet

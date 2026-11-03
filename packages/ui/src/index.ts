@@ -13,6 +13,12 @@ export type { IconName, IconProps } from "./icons";
 export { AddProviderSheet } from "./settings/AddProviderSheet";
 export type { AddProviderSheetProps, ProviderPresetSummary } from "./settings/AddProviderSheet";
 
+export { ConfirmDialog } from "./primitives/ConfirmDialog";
+export type { ConfirmDialogProps } from "./primitives/ConfirmDialog";
+
+export { ProviderMenu } from "./settings/ProviderMenu";
+export type { ProviderMenuProps } from "./settings/ProviderMenu";
+
 export { ProviderList } from "./settings/ProviderList";
 export type { ProviderListProps, ProviderSummary } from "./settings/ProviderList";
 
