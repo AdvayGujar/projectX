@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Icon } from "../icons";
 import { colors, HIT_SLOP, radius, space, typography } from "../theme";
-import type { SourceRef, ViewTurn } from "../types";
+import type { SourceRef, TurnAttachment, ViewTurn } from "../types";
 import { Markdown } from "../markdown/Markdown";
 import { costLine, streamingLabel, summarise } from "./format";
 import { Thought } from "./Thought";
@@ -13,6 +13,7 @@ export interface TranscriptProps {
   readonly turns: readonly ViewTurn[];
   readonly onCopy: (turnId: string) => void;
   readonly onRegenerate: (turnId: string) => void;
+  readonly onOpenAttachment: (turnId: string, attachment: TurnAttachment) => void;
   readonly onReadAloud: (turnId: string) => void;
   readonly onOpenSources: (turnId: string) => void;
 }
@@ -23,6 +24,7 @@ export function Transcript({
   turns,
   onCopy,
   onRegenerate,
+  onOpenAttachment,
   onReadAloud,
   onOpenSources,
 }: TranscriptProps): ReactElement {
@@ -36,10 +38,13 @@ export function Transcript({
             {turn.text.length > 0 ? <Text style={styles.userText}>{turn.text}</Text> : null}
             {turn.attachments && turn.attachments.length > 0 ? (
               <View style={styles.userAttachments}>
-                {turn.attachments.map((attachment, index) => (
-                  <View
-                    key={`${attachment.name}-${index}`}
-                    accessibilityLabel={`Attached ${attachment.name}`}
+                {turn.attachments.map((attachment) => (
+                  <Pressable
+                    key={`${attachment.name}-${attachment.index}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Open ${attachment.name}`}
+                    hitSlop={HIT_SLOP}
+                    onPress={() => onOpenAttachment(turn.id, attachment)}
                     style={styles.userAttachment}
                   >
                     <Icon
@@ -50,7 +55,7 @@ export function Transcript({
                     <Text style={styles.userAttachmentName} numberOfLines={1}>
                       {attachment.name}
                     </Text>
-                  </View>
+                  </Pressable>
                 ))}
               </View>
             ) : null}

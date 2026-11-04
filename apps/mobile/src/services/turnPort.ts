@@ -194,7 +194,8 @@ export function createTurnPort(sink: TurnSink): TurnPort {
 }
 
 function attachmentsOf(input: TurnInput): TurnAttachment[] {
-  return (input.images ?? []).map((image) => ({
+  return (input.images ?? []).map((image, index) => ({
+    index,
     name: image.name,
     mimeType: image.mimeType,
     kind: "image" as const,

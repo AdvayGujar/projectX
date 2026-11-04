@@ -26,6 +26,7 @@ interface MessageRow {
   cached_tokens: number | null;
   cost_usd: number | null;
   effort: string | null;
+  superseded: number;
   status: MessageStatus;
   created_at: number;
 }
@@ -66,7 +67,7 @@ export interface UpdatePartInput {
   searchText?: string | null;
 }
 
-const MESSAGE_COLUMNS = "id, session_id, seq, role, provider_id, model_id, input_tokens, output_tokens, cached_tokens, cost_usd, effort, status, created_at";
+const MESSAGE_COLUMNS = "id, session_id, seq, role, provider_id, model_id, input_tokens, output_tokens, cached_tokens, cost_usd, effort, superseded, status, created_at";
 const PART_COLUMNS = "id, message_id, seq, type, data_json, search_text, created_at";
 
 export function createMessageRepository({ db, ids, now }: DbContext) {
@@ -86,6 +87,7 @@ export function createMessageRepository({ db, ids, now }: DbContext) {
         cachedTokens: input.usage?.cachedTokens ?? null,
         costUsd: input.usage?.costUsd ?? null,
         effort: input.effort ?? null,
+        superseded: false,
         status: input.status ?? "done",
         createdAt,
       };
@@ -181,11 +183,14 @@ export function createMessageRepository({ db, ids, now }: DbContext) {
       return { ...mapMessage(row as unknown as MessageRow), parts: parts.get(id) ?? [] };
     },
 
-    async removeAfter(sessionId: string, seq: number): Promise<void> {
+    async markSupersededAfter(sessionId: string, seq: number): Promise<void> {
       try {
-        await db.execute("DELETE FROM messages WHERE session_id = ? AND seq > ?", [sessionId, seq]);
+        await db.execute(
+          "UPDATE messages SET superseded = 1 WHERE session_id = ? AND seq > ?",
+          [sessionId, seq],
+        );
       } catch (error) {
-        throw toDbError(error, "Could not remove later messages.");
+        throw toDbError(error, "Could not supersede later messages.");
       }
     },
 
@@ -207,12 +212,12 @@ function buildPart(input: PartInput, messageId: string, seq: number, id: string,
 
 function insertMessageCommand(message: Message): SqlCommand {
   return [
-    `INSERT INTO messages (${MESSAGE_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO messages (${MESSAGE_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       message.id, message.sessionId, message.seq, message.role,
       message.providerId, message.modelId, message.inputTokens,
       message.outputTokens, message.cachedTokens, message.costUsd,
-      message.effort, message.status, message.createdAt,
+      message.effort, message.superseded ? 1 : 0, message.status, message.createdAt,
     ],
   ];
 }
@@ -273,6 +278,7 @@ function mapMessage(row: MessageRow): Message {
     cachedTokens: nullableNumber(row.cached_tokens),
     costUsd: nullableNumber(row.cost_usd),
     effort: row.effort,
+    superseded: row.superseded === 1,
     status: row.status,
     createdAt: Number(row.created_at),
   };

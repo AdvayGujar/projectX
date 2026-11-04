@@ -53,13 +53,50 @@ export async function createSession(input: {
   return session.id;
 }
 
-/** Prepares the latest reply for regeneration and removes it from the session. */
+/** Prepares the latest reply for regeneration and supersedes it in the session. */
 export async function prepareRegeneration(
   sessionId: string,
   assistantMessageId: string,
 ): Promise<RegenerationTarget | null> {
   const context = await getDbContext();
   return prepareRegenerationInDatabase(context, sessionId, assistantMessageId);
+}
+
+export interface LoadedAttachment {
+  readonly name: string;
+  readonly mimeType: string;
+  readonly kind: "image" | "document";
+  readonly base64: string | null;
+}
+
+/** Reads one attachment's bytes only when the user taps its chip. */
+export async function loadAttachment(
+  messageId: string,
+  index: number,
+): Promise<LoadedAttachment | null> {
+  const context = await getDbContext();
+  const message = await createMessageRepository(context).get(messageId);
+  if (!message) {
+    return null;
+  }
+  const part = message.parts.filter((item) => item.type === "attachment")[index];
+  if (!part) {
+    return null;
+  }
+  const data = part.data;
+  if (typeof data !== "object" || data === null) {
+    return null;
+  }
+  const value = data as { name?: unknown; mimeType?: unknown; kind?: unknown; data?: unknown };
+  if (typeof value.name !== "string") {
+    return null;
+  }
+  return {
+    name: value.name,
+    mimeType: typeof value.mimeType === "string" ? value.mimeType : "application/octet-stream",
+    kind: value.kind === "image" ? "image" : "document",
+    base64: typeof value.data === "string" ? value.data : null,
+  };
 }
 
 /** Reads a session and maps stored messages/parts into view turns. */
@@ -114,6 +151,9 @@ function numericCost(message: MessageWithParts, prices: Map<string, PriceEntry>)
 }
 
 function toTurn(message: MessageWithParts, prices: Map<string, PriceEntry>): ViewTurn | null {
+  if (message.superseded) {
+    return null;
+  }
   const text = joinParts(message.parts, "text");
   if (message.role === "user") {
     const attachments = attachmentsOf(message.parts);
@@ -160,6 +200,7 @@ function attachmentsOf(parts: readonly Part[]): TurnAttachment[] {
       continue;
     }
     attachments.push({
+      index: attachments.length,
       name: value.name,
       mimeType: typeof value.mimeType === "string" ? value.mimeType : "application/octet-stream",
       kind: value.kind === "image" ? "image" : "document",

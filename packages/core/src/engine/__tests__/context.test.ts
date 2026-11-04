@@ -56,6 +56,32 @@ describe("context builder", () => {
     expect(JSON.stringify(context.messages[1])).not.toContain("internal");
   }));
 
+  it("leaves superseded replies out of the model context", () => withContext(async (ctx) => {
+    const sessions = createSessionRepository(ctx);
+    const messages = createMessageRepository(ctx);
+    const session = await sessions.create({});
+    await messages.append({
+      sessionId: session.id,
+      role: "user",
+      parts: [{ type: "text", data: { text: "Try again" } }],
+    });
+    const reply = await messages.append({
+      sessionId: session.id,
+      role: "assistant",
+      parts: [{ type: "text", data: { text: "Old answer" } }],
+    });
+    await messages.markSupersededAfter(session.id, 1);
+
+    const context = await buildContext(ctx, session.id, {
+      system: "",
+      maxTokens: 10_000,
+    });
+
+    expect(context.messages.map((message) => message.role)).toEqual(["user"]);
+    expect(JSON.stringify(context.messages)).not.toContain("Old answer");
+    expect((await messages.get(reply.id))?.superseded).toBe(true);
+  }));
+
   it("keeps at least the newest message when the budget is tiny", () => withContext(async (ctx) => {
     const sessions = createSessionRepository(ctx);
     const messages = createMessageRepository(ctx);

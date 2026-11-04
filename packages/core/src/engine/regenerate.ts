@@ -10,9 +10,9 @@ export interface RegenerationTarget {
 
 /**
  * Prepares the latest assistant reply for regeneration: finds the user turn it answered,
- * rejects older replies (which would discard newer conversation), then removes the reply
- * and any tool steps that followed. The caller re-runs the turn without appending the user
- * message again.
+ * rejects older replies (which would discard newer conversation), then hides the reply and
+ * any tool steps that followed. They stay in storage so their spend still counts. The
+ * caller re-runs the turn without appending the user message again.
  */
 export async function prepareRegeneration(
   db: DbContext,
@@ -36,7 +36,7 @@ export async function prepareRegeneration(
   if (!user) {
     return null;
   }
-  await messages.removeAfter(sessionId, user.seq);
+  await messages.markSupersededAfter(sessionId, user.seq);
   return {
     selectionId: `${target.providerId}:${target.modelId}`,
     effort: target.effort ?? "Standard",

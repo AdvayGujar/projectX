@@ -13,6 +13,7 @@ function renderBody(turns: readonly ViewTurn[], error: string | null = null, str
       error={error}
       streaming={streaming}
       onRegenerate={noop}
+      onOpenAttachment={noop}
       onReadAloud={noop}
       onOpenSources={noop}
     />,
@@ -61,12 +62,47 @@ describe("SessionBody", () => {
         id: "u1",
         role: "user",
         text: "What is in this chart?",
-        attachments: [{ name: "revenue-chart.png", mimeType: "image/png", kind: "image" }],
+        attachments: [
+          { index: 0, name: "revenue-chart.png", mimeType: "image/png", kind: "image" },
+        ],
       },
     ]);
 
     expect(screen.getByText("revenue-chart.png")).toBeTruthy();
-    expect(screen.getByLabelText("Attached revenue-chart.png")).toBeTruthy();
+    expect(screen.getByLabelText("Open revenue-chart.png")).toBeTruthy();
+  });
+
+  it("opens an attachment from the user turn", async () => {
+    const onOpenAttachment = jest.fn();
+    await render(
+      <SessionBody
+        turns={[
+          {
+            id: "u1",
+            role: "user",
+            text: "Check this",
+            attachments: [
+              { index: 0, name: "photo.png", mimeType: "image/png", kind: "image" },
+            ],
+          },
+        ]}
+        error={null}
+        streaming={false}
+        onRegenerate={noop}
+        onOpenAttachment={onOpenAttachment}
+        onReadAloud={noop}
+        onOpenSources={noop}
+      />,
+    );
+
+    fireEvent.press(screen.getByLabelText("Open photo.png"));
+
+    expect(onOpenAttachment).toHaveBeenCalledWith("u1", {
+      index: 0,
+      name: "photo.png",
+      mimeType: "image/png",
+      kind: "image",
+    });
   });
 
   it("drops the thinking label once reasoning has streamed", async () => {
@@ -97,6 +133,7 @@ describe("SessionBody", () => {
         error={null}
         streaming={false}
         onRegenerate={onRegenerate}
+        onOpenAttachment={noop}
         onReadAloud={noop}
         onOpenSources={noop}
       />,
