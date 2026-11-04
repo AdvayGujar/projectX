@@ -1,6 +1,8 @@
 export { createAdapter } from "./adapterFactory";
 export { createAnthropicAdapter } from "./anthropic";
 export { listProviderModels } from "./catalog";
+export { createRetryingFetch } from "./retry";
+export type { RetryOptions } from "./retry";
 export { createGoogleAdapter } from "./google";
 export { createOpenAiChatAdapter } from "./openaiChat";
 export { createOpenAiResponsesAdapter } from "./openaiResponses";

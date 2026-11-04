@@ -3,6 +3,7 @@ import {
   createAdapter,
   createProviderConfig,
   createProviderRepository,
+  createRetryingFetch,
   createTurnEngine,
 } from "@projectx/core";
 import type {
@@ -23,7 +24,7 @@ import { parseSelectionId, priceTurn } from "./turnMath";
 
 const MAX_OUTPUT_TOKENS = 4_096;
 
-const fetchImpl: FetchLike = (url, init) => fetch(url, init);
+const fetchImpl: FetchLike = createRetryingFetch((url, init) => fetch(url, init));
 
 /** Tools arrive with the document pipeline; the engine still needs an executor. */
 const noTools: ToolExecutor = {

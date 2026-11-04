@@ -5,6 +5,7 @@ import {
   applyKnownCapabilities,
   createProviderConfig,
   createProviderRepository,
+  createRetryingFetch,
   listProviderModels,
 } from "@projectx/core";
 
@@ -23,7 +24,7 @@ export interface SavedProvider {
   readonly models: readonly ModelInfo[];
 }
 
-const fetchImpl: FetchLike = (url, init) => fetch(url, init);
+const fetchImpl: FetchLike = createRetryingFetch((url, init) => fetch(url, init));
 
 /**
  * Validates the key by fetching the model list *before* anything is persisted, so a bad
