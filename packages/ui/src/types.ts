@@ -27,12 +27,20 @@ export interface TurnArtifact {
   readonly subtitle: string;
 }
 
+/** What was attached to a user turn. The bytes stay in storage, not in the transcript. */
+export interface TurnAttachment {
+  readonly name: string;
+  readonly mimeType: string;
+  readonly kind: "image" | "document";
+}
+
 export type TurnViewStatus = "streaming" | "done" | "error";
 
 export interface ViewTurn {
   readonly id: string;
   readonly role: TurnRole;
   readonly text: string;
+  readonly attachments?: readonly TurnAttachment[];
   /** Absent means a stored turn, which is always finished. */
   readonly status?: TurnViewStatus;
   /** False when the turn ran with Think off, so reasoning is not shown. */

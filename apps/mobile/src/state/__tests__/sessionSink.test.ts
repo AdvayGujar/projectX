@@ -22,6 +22,16 @@ describe("session sink", () => {
     expect(store().turns).toEqual([{ id: "user-1", role: "user", text: "hello" }]);
   });
 
+  it("keeps attachment names on the user turn", () => {
+    sink.onUserTurn("user-1", "look", [
+      { name: "photo.png", mimeType: "image/png", kind: "image" },
+    ]);
+
+    expect(store().turns[0]?.attachments).toEqual([
+      { name: "photo.png", mimeType: "image/png", kind: "image" },
+    ]);
+  });
+
   it("clears streaming when the turn settles", () => {
     sink.onUserTurn("user-1", "hello");
     sink.onSettled();

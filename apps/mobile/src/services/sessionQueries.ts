@@ -6,7 +6,7 @@ import {
   prepareRegeneration as prepareRegenerationInDatabase,
 } from "@projectx/core";
 import type { MessageWithParts, Part } from "@projectx/core";
-import type { TurnCost, ViewTurn } from "@projectx/ui";
+import type { TurnAttachment, TurnCost, ViewTurn } from "@projectx/ui";
 
 import { getDbContext } from "../db/client";
 
@@ -116,7 +116,16 @@ function numericCost(message: MessageWithParts, prices: Map<string, PriceEntry>)
 function toTurn(message: MessageWithParts, prices: Map<string, PriceEntry>): ViewTurn | null {
   const text = joinParts(message.parts, "text");
   if (message.role === "user") {
-    return text.length > 0 ? { id: message.id, role: "user", text } : null;
+    const attachments = attachmentsOf(message.parts);
+    if (text.length === 0 && attachments.length === 0) {
+      return null;
+    }
+    return {
+      id: message.id,
+      role: "user",
+      text,
+      ...(attachments.length > 0 ? { attachments } : {}),
+    };
   }
   if (message.role !== "assistant") {
     return null;
@@ -134,6 +143,29 @@ function toTurn(message: MessageWithParts, prices: Map<string, PriceEntry>): Vie
 
 function isTurn(turn: ViewTurn | null): turn is ViewTurn {
   return turn !== null;
+}
+
+function attachmentsOf(parts: readonly Part[]): TurnAttachment[] {
+  const attachments: TurnAttachment[] = [];
+  for (const part of parts) {
+    if (part.type !== "attachment") {
+      continue;
+    }
+    const data = part.data;
+    if (typeof data !== "object" || data === null) {
+      continue;
+    }
+    const value = data as { name?: unknown; mimeType?: unknown; kind?: unknown };
+    if (typeof value.name !== "string") {
+      continue;
+    }
+    attachments.push({
+      name: value.name,
+      mimeType: typeof value.mimeType === "string" ? value.mimeType : "application/octet-stream",
+      kind: value.kind === "image" ? "image" : "document",
+    });
+  }
+  return attachments;
 }
 
 function joinParts(parts: readonly Part[], type: "text" | "reasoning"): string {
