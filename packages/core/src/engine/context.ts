@@ -20,6 +20,7 @@ export async function buildContext(
 
   const system = withSummary(options.system, session?.summary ?? null);
   const messages = history
+    .filter((message) => !message.superseded)
     .map(toLlmMessage)
     .filter((message): message is LlmMessage => message !== null);
   const budget = Math.max(options.maxTokens - estimateText(system), 1_000);

@@ -53,7 +53,7 @@ export async function createSession(input: {
   return session.id;
 }
 
-/** Prepares the latest reply for regeneration and removes it from the session. */
+/** Prepares the latest reply for regeneration and supersedes it in the session. */
 export async function prepareRegeneration(
   sessionId: string,
   assistantMessageId: string,
@@ -114,6 +114,9 @@ function numericCost(message: MessageWithParts, prices: Map<string, PriceEntry>)
 }
 
 function toTurn(message: MessageWithParts, prices: Map<string, PriceEntry>): ViewTurn | null {
+  if (message.superseded) {
+    return null;
+  }
   const text = joinParts(message.parts, "text");
   if (message.role === "user") {
     const attachments = attachmentsOf(message.parts);

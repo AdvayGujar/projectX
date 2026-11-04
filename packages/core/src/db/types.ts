@@ -73,6 +73,8 @@ export interface Message {
   cachedTokens: number | null;
   costUsd: number | null;
   effort: string | null;
+  /** Hidden from transcript and context, but still counted in session spend. */
+  superseded: boolean;
   status: MessageStatus;
   createdAt: number;
 }

@@ -7,7 +7,7 @@ describe("migrations", () => {
   it("applies once and is idempotent", async () => {
     const db = createNodeDatabase();
     try {
-      expect(await migrate(db)).toBe(2);
+      expect(await migrate(db)).toBe(3);
       expect(await migrate(db)).toBe(0);
     } finally {
       await db.close();
@@ -35,10 +35,12 @@ describe("migrations", () => {
     });
   });
 
-  it("adds the effort column to messages", async () => {
+  it("adds the effort and superseded columns to messages", async () => {
     await withContext(async ({ db }) => {
       const result = await db.execute("PRAGMA table_info(messages)");
-      expect(result.rows.map((row) => String(row.name))).toContain("effort");
+      const columns = result.rows.map((row) => String(row.name));
+      expect(columns).toContain("effort");
+      expect(columns).toContain("superseded");
     });
   });
 

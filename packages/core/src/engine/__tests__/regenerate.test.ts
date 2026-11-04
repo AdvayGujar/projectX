@@ -5,7 +5,7 @@ import { withContext } from "../../db/__tests__/helpers";
 import { prepareRegeneration } from "../regenerate";
 
 describe("regeneration", () => {
-  it("returns the answered user turn and drops the reply", () => withContext(async (ctx) => {
+  it("returns the answered user turn and supersedes the reply", () => withContext(async (ctx) => {
     const sessions = createSessionRepository(ctx);
     const messages = createMessageRepository(ctx);
     const session = await sessions.create({});
@@ -20,6 +20,7 @@ describe("regeneration", () => {
       providerId: "provider-1",
       modelId: "deepseek-reasoner",
       effort: "High",
+      usage: { inputTokens: 10, outputTokens: 4, costUsd: 0.0021 },
       parts: [{ type: "text", data: { text: "Here it is" } }],
     });
 
@@ -30,12 +31,17 @@ describe("regeneration", () => {
       effort: "High",
       text: "Explain the report",
     });
-    expect((await messages.list(session.id)).map((message) => message.id)).toEqual([user.id]);
-    expect(await messages.get(assistant.id)).toBeNull();
+    expect((await messages.list(session.id)).map((message) => message.id)).toEqual([
+      user.id,
+      assistant.id,
+    ]);
+    const kept = await messages.get(assistant.id);
+    expect(kept?.superseded).toBe(true);
+    expect(kept?.costUsd).toBeCloseTo(0.0021);
     const parts = await ctx.db.execute("SELECT COUNT(*) AS count FROM parts WHERE message_id = ?", [
       assistant.id,
     ]);
-    expect(Number(parts.rows[0]?.count)).toBe(0);
+    expect(Number(parts.rows[0]?.count)).toBe(1);
   }));
 
   it("refuses to regenerate a reply that is no longer the latest", () => withContext(async (ctx) => {

@@ -1,8 +1,13 @@
 import type { SqlCommand, SqlDatabase, SqlValue, Migration } from "../types";
 import { initialMigration } from "./001-initial";
 import { messageEffortMigration } from "./002-message-effort";
+import { messageSupersededMigration } from "./003-message-superseded";
 
-const migrations: Migration[] = [initialMigration, messageEffortMigration];
+const migrations: Migration[] = [
+  initialMigration,
+  messageEffortMigration,
+  messageSupersededMigration,
+];
 
 export async function migrate(db: SqlDatabase): Promise<number> {
   await db.execute(
