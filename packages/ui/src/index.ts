@@ -60,6 +60,7 @@ export type {
   SourceRef,
   ToolActivity,
   TurnArtifact,
+  TurnAttachment,
   TurnCost,
   TurnRole,
   ViewTurn,

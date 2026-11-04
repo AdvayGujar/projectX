@@ -55,6 +55,40 @@ describe("SessionBody", () => {
     expect(screen.getByText("Beam Free · 10 in / 5 out")).toBeTruthy();
   });
 
+  it("shows the attachments linked to a user message", async () => {
+    await renderBody([
+      {
+        id: "u1",
+        role: "user",
+        text: "What is in this chart?",
+        attachments: [{ name: "revenue-chart.png", mimeType: "image/png", kind: "image" }],
+      },
+    ]);
+
+    expect(screen.getByText("revenue-chart.png")).toBeTruthy();
+    expect(screen.getByLabelText("Attached revenue-chart.png")).toBeTruthy();
+  });
+
+  it("drops the thinking label once reasoning has streamed", async () => {
+    await renderBody(
+      [
+        {
+          id: "a1",
+          role: "assistant",
+          text: "",
+          status: "streaming",
+          reasoningRequested: true,
+          reasoning: "Checked the chart.",
+        },
+      ],
+      null,
+      true,
+    );
+
+    expect(screen.getByText("Thought")).toBeTruthy();
+    expect(screen.queryByText("Thinking…")).toBeNull();
+  });
+
   it("calls back when regenerate is pressed", async () => {
     const onRegenerate = jest.fn();
     await render(

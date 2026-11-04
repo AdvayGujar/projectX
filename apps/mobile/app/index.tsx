@@ -142,7 +142,6 @@ export default function ChatsScreen(): ReactElement {
       <SessionHeader
         model={currentModel?.label ?? "Select model"}
         effort={currentModel?.effort}
-        vision={currentModel?.vision}
         onOpenDrawer={openDrawer}
         onOpenModelPicker={() => setPickerOpen(true)}
       />

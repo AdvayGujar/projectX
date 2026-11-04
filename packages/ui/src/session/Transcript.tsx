@@ -33,7 +33,27 @@ export function Transcript({
       {turns.map((turn) =>
         turn.role === "user" ? (
           <View key={turn.id} style={styles.userRow}>
-            <Text style={styles.userText}>{turn.text}</Text>
+            {turn.text.length > 0 ? <Text style={styles.userText}>{turn.text}</Text> : null}
+            {turn.attachments && turn.attachments.length > 0 ? (
+              <View style={styles.userAttachments}>
+                {turn.attachments.map((attachment, index) => (
+                  <View
+                    key={`${attachment.name}-${index}`}
+                    accessibilityLabel={`Attached ${attachment.name}`}
+                    style={styles.userAttachment}
+                  >
+                    <Icon
+                      name={attachment.kind === "image" ? "image" : "attach"}
+                      size={12}
+                      color={colors.textMuted}
+                    />
+                    <Text style={styles.userAttachmentName} numberOfLines={1}>
+                      {attachment.name}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
           </View>
         ) : (
           <View key={turn.id} style={styles.assistantRow}>
@@ -49,7 +69,7 @@ export function Transcript({
               />
             ) : null}
 
-            {turn.status === "streaming" && turn.text.length === 0 ? (
+            {turn.status === "streaming" && turn.text.length === 0 && !turn.reasoning ? (
               <Text style={styles.thinking}>{streamingLabel(turn.reasoningRequested)}</Text>
             ) : null}
 
@@ -175,6 +195,20 @@ const styles = StyleSheet.create({
     marginTop: space.xl,
   },
   userText: { fontSize: typography.body, lineHeight: typography.bodyLineHeight, color: "#e6dfd4" },
+  userAttachments: { gap: 6, marginTop: 8 },
+  userAttachment: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 6,
+    maxWidth: "100%",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.14)",
+    borderRadius: radius.pill,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  userAttachmentName: { maxWidth: 220, fontSize: typography.small, color: "#e6dfd4" },
   assistantRow: { marginTop: space.sm },
   body: { fontSize: typography.body, lineHeight: typography.bodyLineHeight, color: colors.text },
   thinking: { fontSize: typography.body, lineHeight: typography.bodyLineHeight, color: colors.textFaint },

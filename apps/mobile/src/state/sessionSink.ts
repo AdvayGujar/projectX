@@ -8,10 +8,15 @@ import { useSessionsStore } from "./sessionsStore";
  */
 export function createSessionStoreSink(): TurnSink {
   return {
-    onUserTurn: (id, text) => {
+    onUserTurn: (id, text, attachments) => {
       const store = useSessionStore.getState();
       store.setStreaming(true);
-      store.addTurn({ id, role: "user", text });
+      store.addTurn({
+        id,
+        role: "user",
+        text,
+        ...(attachments && attachments.length > 0 ? { attachments } : {}),
+      });
     },
 
     onAssistantStart: (id, reasoningRequested) => {

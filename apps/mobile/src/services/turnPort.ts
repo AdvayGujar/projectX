@@ -13,6 +13,8 @@ import type {
   ToolExecutor,
 } from "@projectx/core";
 
+import type { TurnAttachment } from "@projectx/ui";
+
 import type { ImageAttachment } from "./attachments";
 
 import { getDbContext } from "../db/client";
@@ -48,7 +50,7 @@ export interface TurnUsage {
  * screen, so a different shell can supply its own sink (docs/ARCHITECTURE.md).
  */
 export interface TurnSink {
-  onUserTurn(id: string, text: string): void;
+  onUserTurn(id: string, text: string, attachments?: readonly TurnAttachment[]): void;
   onAssistantStart(id: string, reasoningRequested: boolean): void;
   onText(id: string, text: string): void;
   onReasoning(id: string, text: string): void;
@@ -134,7 +136,7 @@ export function createTurnPort(sink: TurnSink): TurnPort {
           switch (event.type) {
             case "turn_started":
               if (event.userMessageId) {
-                sink.onUserTurn(event.userMessageId, input.text);
+                sink.onUserTurn(event.userMessageId, input.text, attachmentsOf(input));
               }
               break;
             case "message_started":
@@ -189,6 +191,14 @@ export function createTurnPort(sink: TurnSink): TurnPort {
     stop: () => controller?.abort(),
     isRunning: () => controller !== null,
   };
+}
+
+function attachmentsOf(input: TurnInput): TurnAttachment[] {
+  return (input.images ?? []).map((image) => ({
+    name: image.name,
+    mimeType: image.mimeType,
+    kind: "image" as const,
+  }));
 }
 
 /** Text first, then one attachment part per image so history can rebuild vision input. */
