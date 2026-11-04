@@ -12,6 +12,7 @@ function renderBody(turns: readonly ViewTurn[], error: string | null = null, str
       turns={turns}
       error={error}
       streaming={streaming}
+      onCopy={noop}
       onRegenerate={noop}
       onOpenAttachment={noop}
       onReadAloud={noop}
@@ -88,6 +89,7 @@ describe("SessionBody", () => {
         ]}
         error={null}
         streaming={false}
+        onCopy={noop}
         onRegenerate={noop}
         onOpenAttachment={onOpenAttachment}
         onReadAloud={noop}
@@ -103,6 +105,26 @@ describe("SessionBody", () => {
       mimeType: "image/png",
       kind: "image",
     });
+  });
+
+  it("calls back when copy is pressed", async () => {
+    const onCopy = jest.fn();
+    await render(
+      <SessionBody
+        turns={[{ id: "a1", role: "assistant", text: "done", status: "done" }]}
+        error={null}
+        streaming={false}
+        onCopy={onCopy}
+        onRegenerate={noop}
+        onOpenAttachment={noop}
+        onReadAloud={noop}
+        onOpenSources={noop}
+      />,
+    );
+
+    fireEvent.press(screen.getByLabelText("Copy"));
+
+    expect(onCopy).toHaveBeenCalledWith("a1");
   });
 
   it("drops the thinking label once reasoning has streamed", async () => {
@@ -132,6 +154,7 @@ describe("SessionBody", () => {
         turns={[{ id: "a1", role: "assistant", text: "done", status: "done" }]}
         error={null}
         streaming={false}
+        onCopy={noop}
         onRegenerate={onRegenerate}
         onOpenAttachment={noop}
         onReadAloud={noop}
