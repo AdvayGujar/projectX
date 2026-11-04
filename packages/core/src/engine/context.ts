@@ -55,6 +55,11 @@ function toLlmMessage(message: MessageWithParts): LlmMessage | null {
       if (call) {
         parts.push(call);
       }
+    } else if (part.type === "attachment" && message.role === "user") {
+      const image = imageOf(part);
+      if (image) {
+        parts.push(image);
+      }
     }
   }
 
@@ -71,6 +76,22 @@ function textOf(part: Part): string | null {
     return typeof text === "string" ? text : null;
   }
   return null;
+}
+
+function imageOf(part: Part): LlmPart | null {
+  const data = part.data;
+  if (typeof data !== "object" || data === null) {
+    return null;
+  }
+  const value = data as { kind?: unknown; mimeType?: unknown; data?: unknown };
+  if (
+    value.kind !== "image" ||
+    typeof value.mimeType !== "string" ||
+    typeof value.data !== "string"
+  ) {
+    return null;
+  }
+  return { type: "image", mimeType: value.mimeType, data: value.data };
 }
 
 function toolCallOf(part: Part): LlmPart | null {

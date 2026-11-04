@@ -57,12 +57,16 @@ export interface ModelOption {
   readonly provider: string;
   readonly effort: string;
   readonly reasoning: boolean;
+  readonly vision: boolean;
 }
 
-/** A file picked in the composer. Not yet uploaded or sent. */
+/** A file picked in the composer. Images become vision input; documents wait for extraction. */
 export interface AttachmentChip {
   readonly id: string;
   readonly name: string;
+  readonly mimeType: string;
+  readonly kind: "image" | "document";
+  readonly size: number | null;
 }
 
 /** Effort levels offered after choosing a reasoning-capable model. */

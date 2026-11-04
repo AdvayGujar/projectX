@@ -14,7 +14,13 @@ describe("context builder", () => {
     await messages.append({
       sessionId: session.id,
       role: "user",
-      parts: [{ type: "text", data: { text: "Summarise this" }, searchText: "Summarise this" }],
+      parts: [
+        { type: "text", data: { text: "Summarise this" }, searchText: "Summarise this" },
+        {
+          type: "attachment",
+          data: { kind: "image", name: "chart.png", mimeType: "image/png", data: "cGFnZQ==" },
+        },
+      ],
     });
     await messages.append({
       sessionId: session.id,
@@ -41,6 +47,11 @@ describe("context builder", () => {
 
     expect(context.system).toContain("Conversation summary so far");
     expect(context.messages.map((message) => message.role)).toEqual(["user", "assistant", "tool"]);
+    expect(context.messages[0]?.parts).toContainEqual({
+      type: "image",
+      mimeType: "image/png",
+      data: "cGFnZQ==",
+    });
     expect(context.messages[1]?.parts.some((part) => part.type === "tool_call")).toBe(true);
     expect(JSON.stringify(context.messages[1])).not.toContain("internal");
   }));

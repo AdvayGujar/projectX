@@ -8,6 +8,7 @@ import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-na
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useOpenDrawer } from "../src/navigation/useOpenDrawer";
+import { attachmentProblem, readImageAttachments } from "../src/services/attachments";
 import { createSession } from "../src/services/sessionQueries";
 import { turnService } from "../src/services/turnService";
 import { useModelCatalog } from "../src/state/useModelCatalog";
@@ -51,6 +52,19 @@ export default function ChatsScreen(): ReactElement {
       return;
     }
 
+    const problem = attachmentProblem(attachments, selection);
+    if (problem) {
+      setError(problem);
+      return;
+    }
+    let images;
+    try {
+      images = await readImageAttachments(attachments);
+    } catch {
+      setError("Could not read the attached image. Try attaching it again.");
+      return;
+    }
+
     setError(null);
     try {
       const sessionId = await createSession({
@@ -62,6 +76,7 @@ export default function ChatsScreen(): ReactElement {
       // instead of re-reading an empty session from disk.
       useSessionStore.getState().beginSession(sessionId, value.slice(0, 60), []);
       setText("");
+      setAttachments([]);
       router.push({ pathname: "/session/[id]", params: { id: sessionId } });
       void turnService.send({
         sessionId,
@@ -69,6 +84,7 @@ export default function ChatsScreen(): ReactElement {
         effort: selection.effort,
         text: value,
         think,
+        images,
       });
     } catch {
       setError("Could not start the chat.");
@@ -84,7 +100,17 @@ export default function ChatsScreen(): ReactElement {
     if (result.canceled || !asset) {
       return;
     }
-    setAttachments((current) => [...current, { id: asset.uri, name: asset.name }]);
+    const mimeType = asset.mimeType ?? "application/octet-stream";
+    setAttachments((current) => [
+      ...current,
+      {
+        id: asset.uri,
+        name: asset.name,
+        mimeType,
+        kind: mimeType.startsWith("image/") ? "image" : "document",
+        size: asset.size ?? null,
+      },
+    ]);
   }
 
   function runEmptyAction(key: string): void {
