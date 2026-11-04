@@ -67,6 +67,7 @@ export function createTurnEngine({ db, adapter, tools }: EngineDeps) {
           providerId: options.provider.config.id,
           modelId: options.model.id,
           status: "streaming",
+          effort: options.effort,
           parts: [],
         });
         assistantIds.push(assistant.id);

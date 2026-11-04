@@ -7,7 +7,7 @@ describe("migrations", () => {
   it("applies once and is idempotent", async () => {
     const db = createNodeDatabase();
     try {
-      expect(await migrate(db)).toBe(1);
+      expect(await migrate(db)).toBe(2);
       expect(await migrate(db)).toBe(0);
     } finally {
       await db.close();
@@ -32,6 +32,13 @@ describe("migrations", () => {
         "doc_chunks",
         "doc_chunks_fts",
       ]));
+    });
+  });
+
+  it("adds the effort column to messages", async () => {
+    await withContext(async ({ db }) => {
+      const result = await db.execute("PRAGMA table_info(messages)");
+      expect(result.rows.map((row) => String(row.name))).toContain("effort");
     });
   });
 
