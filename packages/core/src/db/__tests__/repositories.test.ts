@@ -159,6 +159,7 @@ describe("message repository", () => {
       sessionId: session.id,
       role: "assistant",
       status: "streaming",
+      effort: "High",
       parts: [],
     });
 
@@ -175,5 +176,6 @@ describe("message repository", () => {
     expect(updated?.outputTokens).toBe(40);
     expect(updated?.cachedTokens).toBe(10);
     expect(updated?.costUsd).toBeCloseTo(0.0003);
+    expect(updated?.effort).toBe("High");
   }));
 });

@@ -88,6 +88,7 @@ describe("turn engine", () => {
       system: "You are helpful.",
       userParts: [{ type: "text", data: { text: "Hi" }, searchText: "Hi" }],
       maxOutputTokens: 100,
+      effort: "High",
       onEvent: (event) => events.push(event),
     });
 
@@ -96,6 +97,7 @@ describe("turn engine", () => {
     expect(history.map((message) => message.role)).toEqual(["user", "assistant"]);
     expect(history[1]?.parts[0]?.data).toEqual({ text: "Hello" });
     expect(history[1]?.inputTokens).toBe(10);
+    expect(history[1]?.effort).toBe("High");
     expect(history[1]?.status).toBe("done");
     expect(events.some((event) => event.type === "turn_finished" && event.status === "done")).toBe(true);
   }));

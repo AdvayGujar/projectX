@@ -115,6 +115,7 @@ export function createTurnPort(sink: TurnSink): TurnPort {
         model,
         provider: runtime,
         system: "",
+        effort: input.effort,
         userParts: [{ type: "text", data: { text: input.text } }],
         maxOutputTokens: Math.min(model.maxOutput, MAX_OUTPUT_TOKENS),
         signal: controller.signal,

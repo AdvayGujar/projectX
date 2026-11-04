@@ -154,6 +154,7 @@ function costOf(message: MessageWithParts, prices: Map<string, PriceEntry>): Tur
 
   return {
     model: entry?.label ?? message.modelId ?? "unknown model",
+    ...(message.effort ? { effort: message.effort } : {}),
     tokens: `${input.toLocaleString()} in / ${output.toLocaleString()} out`,
     ...(usd === null ? {} : { usd: `$${usd.toFixed(4)}` }),
   };

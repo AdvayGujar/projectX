@@ -25,6 +25,7 @@ interface MessageRow {
   output_tokens: number | null;
   cached_tokens: number | null;
   cost_usd: number | null;
+  effort: string | null;
   status: MessageStatus;
   created_at: number;
 }
@@ -50,6 +51,7 @@ export interface AppendMessageInput {
   providerId?: string | null;
   modelId?: string | null;
   status?: MessageStatus;
+  effort?: string | null;
   parts: PartInput[];
   usage?: Usage;
 }
@@ -64,7 +66,7 @@ export interface UpdatePartInput {
   searchText?: string | null;
 }
 
-const MESSAGE_COLUMNS = "id, session_id, seq, role, provider_id, model_id, input_tokens, output_tokens, cached_tokens, cost_usd, status, created_at";
+const MESSAGE_COLUMNS = "id, session_id, seq, role, provider_id, model_id, input_tokens, output_tokens, cached_tokens, cost_usd, effort, status, created_at";
 const PART_COLUMNS = "id, message_id, seq, type, data_json, search_text, created_at";
 
 export function createMessageRepository({ db, ids, now }: DbContext) {
@@ -83,6 +85,7 @@ export function createMessageRepository({ db, ids, now }: DbContext) {
         outputTokens: input.usage?.outputTokens ?? null,
         cachedTokens: input.usage?.cachedTokens ?? null,
         costUsd: input.usage?.costUsd ?? null,
+        effort: input.effort ?? null,
         status: input.status ?? "done",
         createdAt,
       };
@@ -196,12 +199,12 @@ function buildPart(input: PartInput, messageId: string, seq: number, id: string,
 
 function insertMessageCommand(message: Message): SqlCommand {
   return [
-    `INSERT INTO messages (${MESSAGE_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO messages (${MESSAGE_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       message.id, message.sessionId, message.seq, message.role,
       message.providerId, message.modelId, message.inputTokens,
       message.outputTokens, message.cachedTokens, message.costUsd,
-      message.status, message.createdAt,
+      message.effort, message.status, message.createdAt,
     ],
   ];
 }
@@ -261,6 +264,7 @@ function mapMessage(row: MessageRow): Message {
     outputTokens: nullableNumber(row.output_tokens),
     cachedTokens: nullableNumber(row.cached_tokens),
     costUsd: nullableNumber(row.cost_usd),
+    effort: row.effort,
     status: row.status,
     createdAt: Number(row.created_at),
   };

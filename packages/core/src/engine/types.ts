@@ -54,6 +54,8 @@ export interface RunTurnOptions {
   maxOutputTokens: number;
   temperature?: number;
   maxSteps?: number;
+  /** Reasoning effort the user chose for this turn, stored with the assistant message. */
+  effort?: string;
   signal?: AbortSignal;
   onEvent?: (event: TurnEvent) => void;
 }
