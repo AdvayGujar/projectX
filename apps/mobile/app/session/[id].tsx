@@ -12,7 +12,7 @@ import { SessionBody } from "../../src/screens/session/SessionBody";
 import { attachmentProblem, readImageAttachments } from "../../src/services/attachments";
 import { SessionComposerSection } from "../../src/screens/session/SessionComposerSection";
 import { SessionTopBar } from "../../src/screens/session/SessionTopBar";
-import { loadSession } from "../../src/services/sessionQueries";
+import { loadSession, prepareRegeneration } from "../../src/services/sessionQueries";
 import { turnService } from "../../src/services/turnService";
 import { useModelCatalog } from "../../src/state/useModelCatalog";
 import { useModelStore } from "../../src/state/modelStore";
@@ -129,6 +129,36 @@ export default function SessionScreen(): ReactElement {
     ]);
   }
 
+  async function regenerate(turnId: string): Promise<void> {
+    if (streaming) {
+      return;
+    }
+    try {
+      const target = await prepareRegeneration(sessionId, turnId);
+      if (!target) {
+        setError("Only the latest reply can be regenerated.");
+        return;
+      }
+      const loaded = await loadSession(sessionId);
+      if (!loaded) {
+        setError("Could not reload this chat.");
+        return;
+      }
+      beginSession(sessionId, loaded.title, loaded.turns, loaded.totals);
+      setError(null);
+      void turnService.send({
+        sessionId,
+        selectionId: target.selectionId,
+        effort: target.effort,
+        text: target.text,
+        think: target.effort !== "Standard",
+        regenerate: true,
+      });
+    } catch {
+      setError("Could not regenerate this reply.");
+    }
+  }
+
   function readAloud(turnId: string): void {
     if (muted) {
       return;
@@ -167,6 +197,9 @@ export default function SessionScreen(): ReactElement {
         turns={turns}
         error={error}
         streaming={streaming}
+        onRegenerate={(turnId) => {
+          void regenerate(turnId);
+        }}
         onReadAloud={readAloud}
         onOpenSources={() => setSourcesOpen(true)}
       />

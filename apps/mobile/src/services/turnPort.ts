@@ -65,6 +65,8 @@ export interface TurnInput {
   readonly effort: string;
   readonly think: boolean;
   readonly images?: readonly ImageAttachment[];
+  /** Re-runs the answer to an existing user message instead of appending a new one. */
+  readonly regenerate?: boolean;
 }
 
 export interface TurnPort {
@@ -125,13 +127,15 @@ export function createTurnPort(sink: TurnSink): TurnPort {
         provider: runtime,
         system: "",
         effort: input.effort,
-        userParts: userParts(input),
+        userParts: input.regenerate ? [] : userParts(input),
         maxOutputTokens: Math.min(model.maxOutput, MAX_OUTPUT_TOKENS),
         signal: controller.signal,
         onEvent: (event) => {
           switch (event.type) {
             case "turn_started":
-              sink.onUserTurn(event.userMessageId ?? `user-${Date.now()}`, input.text);
+              if (event.userMessageId) {
+                sink.onUserTurn(event.userMessageId, input.text);
+              }
               break;
             case "message_started":
               sink.onAssistantStart(event.messageId, input.think);

@@ -8,6 +8,7 @@ export interface SessionBodyProps {
   readonly turns: readonly ViewTurn[];
   readonly error: string | null;
   readonly streaming: boolean;
+  readonly onRegenerate: (turnId: string) => void;
   readonly onReadAloud: (turnId: string) => void;
   readonly onOpenSources: () => void;
 }
@@ -17,6 +18,7 @@ export function SessionBody({
   turns,
   error,
   streaming,
+  onRegenerate,
   onReadAloud,
   onOpenSources,
 }: SessionBodyProps): ReactElement {
@@ -34,7 +36,7 @@ export function SessionBody({
         <Transcript
           turns={turns}
           onCopy={() => undefined}
-          onRegenerate={() => undefined}
+          onRegenerate={onRegenerate}
           onReadAloud={onReadAloud}
           onOpenSources={onOpenSources}
         />
