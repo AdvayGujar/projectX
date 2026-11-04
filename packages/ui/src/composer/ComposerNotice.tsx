@@ -2,10 +2,12 @@ import type { ReactElement } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Icon } from "../icons";
+import type { IconName } from "../icons";
 import { colors, HIT_SLOP, radius, space, typography } from "../theme";
 
 export interface ComposerNoticeProps {
   readonly message: string | null;
+  readonly icon?: IconName;
   readonly onDismiss: () => void;
 }
 
@@ -13,13 +15,17 @@ export interface ComposerNoticeProps {
  * A notice that floats directly above the composer. Used for capability problems so the
  * message sits where the user is looking instead of becoming transcript text.
  */
-export function ComposerNotice({ message, onDismiss }: ComposerNoticeProps): ReactElement | null {
+export function ComposerNotice({
+  message,
+  icon = "attach",
+  onDismiss,
+}: ComposerNoticeProps): ReactElement | null {
   if (!message) {
     return null;
   }
   return (
     <View style={styles.wrap} accessibilityRole="alert" accessibilityLiveRegion="polite">
-      <Icon name="image" size={15} color={colors.textMuted} />
+      <Icon name={icon} size={15} color={colors.textMuted} />
       <Text style={styles.text}>{message}</Text>
       <Pressable
         accessibilityRole="button"

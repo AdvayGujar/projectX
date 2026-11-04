@@ -8,6 +8,7 @@ export interface SessionBodyProps {
   readonly turns: readonly ViewTurn[];
   readonly error: string | null;
   readonly streaming: boolean;
+  readonly onCopy: (turnId: string) => void;
   readonly onRegenerate: (turnId: string) => void;
   readonly onOpenAttachment: (turnId: string, attachment: TurnAttachment) => void;
   readonly onReadAloud: (turnId: string) => void;
@@ -19,6 +20,7 @@ export function SessionBody({
   turns,
   error,
   streaming,
+  onCopy,
   onRegenerate,
   onOpenAttachment,
   onReadAloud,
@@ -37,7 +39,7 @@ export function SessionBody({
       {turns.length > 0 ? (
         <Transcript
           turns={turns}
-          onCopy={() => undefined}
+          onCopy={onCopy}
           onRegenerate={onRegenerate}
           onOpenAttachment={onOpenAttachment}
           onReadAloud={onReadAloud}

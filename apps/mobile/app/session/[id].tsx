@@ -1,4 +1,4 @@
-import type { AttachmentChip, SourceRef } from "@projectx/ui";
+import type { AttachmentChip, IconName, SourceRef } from "@projectx/ui";
 import {
   AttachmentViewer,
   ComposerNotice,
@@ -7,6 +7,7 @@ import {
   SourcesSheet,
   colors,
 } from "@projectx/ui";
+import * as Clipboard from "expo-clipboard";
 import * as DocumentPicker from "expo-document-picker";
 import { useLocalSearchParams } from "expo-router";
 import * as Speech from "expo-speech";
@@ -57,7 +58,7 @@ export default function SessionScreen(): ReactElement {
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [attachments, setAttachments] = useState<readonly AttachmentChip[]>([]);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ message: string; icon: IconName } | null>(null);
   const [viewer, setViewer] = useState<LoadedAttachment | null>(null);
 
   useEffect(() => {
@@ -98,14 +99,14 @@ export default function SessionScreen(): ReactElement {
     }
     const problem = attachmentProblem(attachments, currentModel);
     if (problem) {
-      setNotice(problem);
+      setNotice({ message: problem, icon: "image" });
       return;
     }
     let images;
     try {
       images = await readImageAttachments(attachments);
     } catch {
-      setNotice("Could not read the attached image. Try attaching it again.");
+      setNotice({ message: "Could not read the attached image. Try attaching it again.", icon: "image" });
       return;
     }
     setError(null);
@@ -179,16 +180,29 @@ export default function SessionScreen(): ReactElement {
     try {
       const loaded = await loadAttachment(turnId, index);
       if (!loaded) {
-        setNotice("That attachment is no longer available.");
+        setNotice({ message: "That attachment is no longer available.", icon: "image" });
         return;
       }
       if (loaded.kind !== "image" || !loaded.base64) {
-        setNotice("Preview is only available for images right now.");
+        setNotice({ message: "Preview is only available for images right now.", icon: "image" });
         return;
       }
       setViewer(loaded);
     } catch {
-      setNotice("Could not open the attachment.");
+      setNotice({ message: "Could not open the attachment.", icon: "image" });
+    }
+  }
+
+  async function copyTurn(turnId: string): Promise<void> {
+    const turn = turns.find((item) => item.id === turnId);
+    if (!turn || turn.text.length === 0) {
+      return;
+    }
+    try {
+      await Clipboard.setStringAsync(turn.text);
+      setNotice({ message: "Copied to clipboard.", icon: "copy" });
+    } catch {
+      setNotice({ message: "Could not copy this reply.", icon: "copy" });
     }
   }
 
@@ -230,6 +244,9 @@ export default function SessionScreen(): ReactElement {
         turns={turns}
         error={error}
         streaming={streaming}
+        onCopy={(turnId) => {
+          void copyTurn(turnId);
+        }}
         onRegenerate={(turnId) => {
           void regenerate(turnId);
         }}
@@ -240,7 +257,11 @@ export default function SessionScreen(): ReactElement {
         onOpenSources={() => setSourcesOpen(true)}
       />
 
-      <ComposerNotice message={notice} onDismiss={() => setNotice(null)} />
+      <ComposerNotice
+        message={notice?.message ?? null}
+        icon={notice?.icon}
+        onDismiss={() => setNotice(null)}
+      />
 
       <SessionComposerSection
         text={text}
