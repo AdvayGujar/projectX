@@ -175,7 +175,9 @@ export function createTurnPort(sink: TurnSink): TurnPort {
         sink.onError(result.error.userMessage);
       }
     } catch (failure) {
-      sink.onError(describe(failure));
+      if (!controller?.signal.aborted) {
+        sink.onError(describe(failure));
+      }
     } finally {
       controller = null;
       sink.onSettled();

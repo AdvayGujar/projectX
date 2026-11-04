@@ -168,6 +168,40 @@ describe("turn engine", () => {
     expect(history.at(-1)?.status).toBe("aborted");
   }));
 
+  it("treats a raw abort rejection as cancelled", () => withContext(async (ctx) => {
+    const sessions = createSessionRepository(ctx);
+    const messages = createMessageRepository(ctx);
+    const session = await sessions.create({});
+    const controller = new AbortController();
+    const adapter: ProviderAdapter = {
+      async listModels() {
+        return [];
+      },
+      async *stream() {
+        controller.abort();
+        throw new Error("signal is aborted without reason");
+      },
+    };
+    const events: TurnEvent[] = [];
+    const engine = createTurnEngine({ db: ctx, adapter, tools: noTools });
+
+    const result = await engine.runTurn({
+      sessionId: session.id,
+      model: fixtureModel(),
+      provider,
+      system: "",
+      userParts: [{ type: "text", data: { text: "Hi" } }],
+      maxOutputTokens: 100,
+      signal: controller.signal,
+      onEvent: (event) => events.push(event),
+    });
+
+    const history = await messages.list(session.id);
+    expect(result.status).toBe("aborted");
+    expect(history.at(-1)?.status).toBe("aborted");
+    expect(events.some((event) => event.type === "error")).toBe(false);
+  }));
+
   it("records provider failures", () => withContext(async (ctx) => {
     const sessions = createSessionRepository(ctx);
     const messages = createMessageRepository(ctx);
