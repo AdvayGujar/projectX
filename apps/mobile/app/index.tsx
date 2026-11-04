@@ -1,4 +1,4 @@
-import type { AttachmentChip, EmptyAction } from "@projectx/ui";
+import type { AttachmentChip, EmptyAction, IconName } from "@projectx/ui";
 import {
   Composer,
   ComposerNotice,
@@ -41,7 +41,7 @@ export default function ChatsScreen(): ReactElement {
   const [search, setSearch] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [attachments, setAttachments] = useState<readonly AttachmentChip[]>([]);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ message: string; icon: IconName } | null>(null);
 
   useModelCatalog();
   async function send(): Promise<void> {
@@ -49,26 +49,26 @@ export default function ChatsScreen(): ReactElement {
     const selection = currentModel;
     if (value.length === 0 || !selection) {
       if (!selection) {
-        setNotice("Add a provider and choose a model first.");
+        setNotice({ message: "Add a provider and choose a model first.", icon: "attach" });
       }
       return;
     }
     const separator = selection.id.indexOf(":");
     if (separator <= 0) {
-      setNotice("That model selection is not usable. Pick it again.");
+      setNotice({ message: "That model selection is not usable. Pick it again.", icon: "attach" });
       return;
     }
 
     const problem = attachmentProblem(attachments, selection);
     if (problem) {
-      setNotice(problem);
+      setNotice({ message: problem, icon: "image" });
       return;
     }
     let images;
     try {
       images = await readImageAttachments(attachments);
     } catch {
-      setNotice("Could not read the attached image. Try attaching it again.");
+      setNotice({ message: "Could not read the attached image. Try attaching it again.", icon: "image" });
       return;
     }
 
@@ -94,7 +94,7 @@ export default function ChatsScreen(): ReactElement {
         images,
       });
     } catch {
-      setNotice("Could not start the chat.");
+      setNotice({ message: "Could not start the chat.", icon: "attach" });
     }
   }
 
@@ -148,7 +148,11 @@ export default function ChatsScreen(): ReactElement {
 
       <EmptyState headline="What shall we think through?" actions={EMPTY_ACTIONS} onAction={runEmptyAction} />
 
-      <ComposerNotice message={notice} onDismiss={() => setNotice(null)} />
+      <ComposerNotice
+        message={notice?.message ?? null}
+        icon={notice?.icon}
+        onDismiss={() => setNotice(null)}
+      />
 
       <Composer
         value={text}
