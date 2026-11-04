@@ -22,8 +22,10 @@ if [ -x apps/mobile/android/gradlew ]; then
   (cd apps/mobile/android && ./gradlew --stop >/dev/null 2>&1 || true)
 fi
 
+# apps/mobile/ios/build holds React Native's codegen output, which only `pod install`
+# regenerates. Expo skips pod install when Pods are current, so deleting it breaks the
+# next build with "Build input file cannot be found" in ReactCodegen.
 rm -rf \
-  apps/mobile/ios/build \
   apps/mobile/android/app/build \
   apps/mobile/android/build \
   apps/mobile/android/.gradle \
