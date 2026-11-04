@@ -151,7 +151,7 @@ export default function SessionScreen(): ReactElement {
         selectionId: target.selectionId,
         effort: target.effort,
         text: target.text,
-        think: target.effort !== "Standard",
+        think,
         regenerate: true,
       });
     } catch {
