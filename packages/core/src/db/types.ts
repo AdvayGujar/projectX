@@ -72,6 +72,7 @@ export interface Message {
   outputTokens: number | null;
   cachedTokens: number | null;
   costUsd: number | null;
+  effort: string | null;
   status: MessageStatus;
   createdAt: number;
 }

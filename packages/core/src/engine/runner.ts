@@ -67,6 +67,7 @@ export function createTurnEngine({ db, adapter, tools }: EngineDeps) {
           providerId: options.provider.config.id,
           modelId: options.model.id,
           status: "streaming",
+          effort: options.effort,
           parts: [],
         });
         assistantIds.push(assistant.id);
@@ -127,6 +128,10 @@ async function streamAssistant(
     return { status: "done", stopReason: state.stopReason, toolCalls: state.toolCalls, usage: state.usage };
   } catch (error) {
     await flushQuietly(messages, assistantId, state, now);
+    if (options.signal?.aborted) {
+      await messages.updateStatus(assistantId, "aborted");
+      return { status: "aborted", toolCalls: [] };
+    }
     return handleStreamFailure(error, messages, assistantId, emit);
   }
 }

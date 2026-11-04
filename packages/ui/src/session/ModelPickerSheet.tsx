@@ -170,11 +170,24 @@ function ModelStep({
                   key={model.id}
                   accessibilityRole="button"
                   accessibilityState={{ selected }}
+                  accessibilityHint={model.vision ? "Supports images" : undefined}
                   onPress={() => onChoose(model)}
                   style={styles.row}
                 >
                   <View style={styles.rowText}>
-                    <Text style={styles.label}>{model.label}</Text>
+                    <View style={styles.labelRow}>
+                      <Text style={styles.label}>{model.label}</Text>
+                      {model.vision ? (
+                        <View
+                          accessible
+                          accessibilityLabel="Supports images"
+                          style={styles.visionTag}
+                        >
+                          <Icon name="image" size={12} color={colors.textMuted} />
+                          <Text style={styles.visionText}>Images</Text>
+                        </View>
+                      ) : null}
+                    </View>
                     {model.reasoning ? (
                       <Text style={styles.meta}>Reasoning · choose effort</Text>
                     ) : null}
@@ -298,7 +311,10 @@ const styles = StyleSheet.create({
     borderBottomColor: "rgba(255,255,255,0.08)",
   },
   rowText: { flex: 1, gap: 2 },
+  labelRow: { flexDirection: "row", alignItems: "center", gap: 7 },
   label: { fontSize: typography.body, color: colors.text },
+  visionTag: { flexDirection: "row", alignItems: "center", gap: 4 },
+  visionText: { fontSize: typography.small, color: colors.textMuted },
   meta: { fontSize: typography.small, color: colors.textMuted },
   empty: {
     paddingVertical: space.lg,

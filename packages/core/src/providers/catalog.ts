@@ -1,10 +1,35 @@
+import { z } from "zod";
+
 import { createAdapter } from "./adapterFactory";
 import { providerError } from "./errors";
-import { mergeModels } from "./registry";
+import { mergeFetchedModels } from "./registry";
+import type { FetchedModelInfo } from "./registry";
 import type { FetchLike, ModelInfo, ProviderConfig } from "./types";
 
 const GO_MODELS_URL = "https://opencode.ai/inference/go/v1/models";
 const USER_AGENT = "ProjectX/0.0.0";
+
+const goModelSchema = z.object({
+  id: z.string(),
+  name: z.string().optional(),
+  modalities: z.object({ input: z.array(z.string()) }).optional(),
+  capabilities: z
+    .object({
+      tools: z.object({ supported: z.boolean() }).optional(),
+      reasoning: z.object({ supported: z.boolean() }).optional(),
+    })
+    .optional(),
+  limit: z
+    .object({
+      context: z.number().optional(),
+      output: z.number().optional(),
+    })
+    .optional(),
+});
+
+const goCatalogSchema = z.object({
+  data: z.array(z.unknown()).optional(),
+});
 
 export async function listProviderModels(
   config: ProviderConfig,
@@ -34,17 +59,40 @@ async function listGoModels(
     response = await fetchImpl(GO_MODELS_URL, { headers });
   } catch {
     // Offline onboarding still gets the curated Go catalog.
-    return mergeModels(config, []);
+    return mergeFetchedModels(config, []);
   }
   if (!response.ok) {
     if (response.status === 401 || response.status === 403) {
       throw await providerError(response, config.label);
     }
-    return mergeModels(config, []);
+    return mergeFetchedModels(config, []);
   }
-  const payload = await response.json() as { data?: Array<{ id?: unknown }> };
-  const ids = Array.isArray(payload.data)
-    ? payload.data.map((item) => item.id).filter((id): id is string => typeof id === "string")
+  const parsed = goCatalogSchema.safeParse(await response.json());
+  const fetched = parsed.success
+    ? parsed.data.data?.flatMap(toFetchedModel) ?? []
     : [];
-  return mergeModels(config, ids);
+  return mergeFetchedModels(config, fetched);
+}
+
+function toFetchedModel(raw: unknown): FetchedModelInfo[] {
+  const parsed = goModelSchema.safeParse(raw);
+  if (!parsed.success) {
+    return [];
+  }
+  const model = parsed.data;
+  const inputs = model.modalities?.input;
+  const vision = inputs ? inputs.some((mime) => mime.startsWith("image/")) : undefined;
+  return [{
+    id: model.id,
+    ...(model.name ? { label: model.name } : {}),
+    ...(vision === undefined ? {} : { vision }),
+    ...(model.capabilities?.tools
+      ? { tools: model.capabilities.tools.supported }
+      : {}),
+    ...(model.capabilities?.reasoning
+      ? { reasoning: model.capabilities.reasoning.supported }
+      : {}),
+    ...(model.limit?.context === undefined ? {} : { contextWindow: model.limit.context }),
+    ...(model.limit?.output === undefined ? {} : { maxOutput: model.limit.output }),
+  }];
 }

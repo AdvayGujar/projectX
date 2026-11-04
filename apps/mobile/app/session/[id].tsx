@@ -1,5 +1,5 @@
 import type { AttachmentChip, SourceRef } from "@projectx/ui";
-import { ModelPickerSheet, SessionMenu, SourcesSheet, colors } from "@projectx/ui";
+import { ComposerNotice, ModelPickerSheet, SessionMenu, SourcesSheet, colors } from "@projectx/ui";
 import * as DocumentPicker from "expo-document-picker";
 import { useLocalSearchParams } from "expo-router";
 import * as Speech from "expo-speech";
@@ -9,9 +9,10 @@ import { KeyboardAvoidingView, Platform, StyleSheet, View } from "react-native";
 
 import { useOpenDrawer } from "../../src/navigation/useOpenDrawer";
 import { SessionBody } from "../../src/screens/session/SessionBody";
+import { attachmentProblem, readImageAttachments } from "../../src/services/attachments";
 import { SessionComposerSection } from "../../src/screens/session/SessionComposerSection";
 import { SessionTopBar } from "../../src/screens/session/SessionTopBar";
-import { loadSession } from "../../src/services/sessionQueries";
+import { loadSession, prepareRegeneration } from "../../src/services/sessionQueries";
 import { turnService } from "../../src/services/turnService";
 import { useModelCatalog } from "../../src/state/useModelCatalog";
 import { useModelStore } from "../../src/state/modelStore";
@@ -44,6 +45,7 @@ export default function SessionScreen(): ReactElement {
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [attachments, setAttachments] = useState<readonly AttachmentChip[]>([]);
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     if (sessionId.length === 0 || activeSessionId === sessionId) {
@@ -72,7 +74,7 @@ export default function SessionScreen(): ReactElement {
     [turns],
   );
 
-  function send(): void {
+  async function send(): Promise<void> {
     const value = text.trim();
     if (value.length === 0 || streaming) {
       return;
@@ -81,13 +83,29 @@ export default function SessionScreen(): ReactElement {
       setError("Choose a model before sending.");
       return;
     }
+    const problem = attachmentProblem(attachments, currentModel);
+    if (problem) {
+      setNotice(problem);
+      return;
+    }
+    let images;
+    try {
+      images = await readImageAttachments(attachments);
+    } catch {
+      setNotice("Could not read the attached image. Try attaching it again.");
+      return;
+    }
+    setError(null);
+    setNotice(null);
     setText("");
+    setAttachments([]);
     void turnService.send({
       sessionId,
       selectionId: currentModel.id,
       effort: currentModel.effort,
       text: value,
       think,
+      images,
     });
   }
 
@@ -100,7 +118,48 @@ export default function SessionScreen(): ReactElement {
     if (result.canceled || !asset) {
       return;
     }
-    setAttachments((current) => [...current, { id: asset.uri, name: asset.name }]);
+    const mimeType = asset.mimeType ?? "application/octet-stream";
+    setNotice(null);
+    setAttachments((current) => [
+      ...current,
+      {
+        id: asset.uri,
+        name: asset.name,
+        mimeType,
+        kind: mimeType.startsWith("image/") ? "image" : "document",
+        size: asset.size ?? null,
+      },
+    ]);
+  }
+
+  async function regenerate(turnId: string): Promise<void> {
+    if (streaming) {
+      return;
+    }
+    try {
+      const target = await prepareRegeneration(sessionId, turnId);
+      if (!target) {
+        setError("Only the latest reply can be regenerated.");
+        return;
+      }
+      const loaded = await loadSession(sessionId);
+      if (!loaded) {
+        setError("Could not reload this chat.");
+        return;
+      }
+      beginSession(sessionId, loaded.title, loaded.turns, loaded.totals);
+      setError(null);
+      void turnService.send({
+        sessionId,
+        selectionId: target.selectionId,
+        effort: target.effort,
+        text: target.text,
+        think,
+        regenerate: true,
+      });
+    } catch {
+      setError("Could not regenerate this reply.");
+    }
   }
 
   function readAloud(turnId: string): void {
@@ -132,6 +191,7 @@ export default function SessionScreen(): ReactElement {
         <SessionTopBar
         modelLabel={currentModel?.label ?? "Select model"}
         effort={currentModel?.effort}
+        vision={currentModel?.vision}
         onOpenDrawer={openDrawer}
         onOpenModelPicker={() => setPickerOpen(true)}
         onOpenMenu={() => setMenuOpen(true)}
@@ -141,9 +201,14 @@ export default function SessionScreen(): ReactElement {
         turns={turns}
         error={error}
         streaming={streaming}
+        onRegenerate={(turnId) => {
+          void regenerate(turnId);
+        }}
         onReadAloud={readAloud}
         onOpenSources={() => setSourcesOpen(true)}
       />
+
+      <ComposerNotice message={notice} onDismiss={() => setNotice(null)} />
 
       <SessionComposerSection
         text={text}
@@ -158,10 +223,13 @@ export default function SessionScreen(): ReactElement {
         onAttach={() => {
           void attach();
         }}
-        onRemoveAttachment={(id) =>
-          setAttachments((current) => current.filter((item) => item.id !== id))
-        }
-        onSend={send}
+        onRemoveAttachment={(id) => {
+          setNotice(null);
+          setAttachments((current) => current.filter((item) => item.id !== id));
+        }}
+        onSend={() => {
+          void send();
+        }}
         onStop={() => turnService.stop()}
         onRecord={() => undefined}
       />
@@ -184,7 +252,10 @@ export default function SessionScreen(): ReactElement {
         visible={pickerOpen}
         models={models}
         selectedId={currentModel?.id ?? null}
-        onSelect={(model, effort) => selectModel(model, effort)}
+        onSelect={(model, effort) => {
+          setNotice(null);
+          selectModel(model, effort);
+        }}
         onClose={() => setPickerOpen(false)}
       />
       </View>

@@ -1,13 +1,21 @@
 import type { AttachmentChip, EmptyAction } from "@projectx/ui";
-import { Composer, EmptyState, ModelPickerSheet, SessionHeader, colors } from "@projectx/ui";
+import {
+  Composer,
+  ComposerNotice,
+  EmptyState,
+  ModelPickerSheet,
+  SessionHeader,
+  colors,
+} from "@projectx/ui";
 import * as DocumentPicker from "expo-document-picker";
 import { useRouter } from "expo-router";
 import type { ReactElement } from "react";
 import { useState } from "react";
-import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native";
+import { KeyboardAvoidingView, Platform, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useOpenDrawer } from "../src/navigation/useOpenDrawer";
+import { attachmentProblem, readImageAttachments } from "../src/services/attachments";
 import { createSession } from "../src/services/sessionQueries";
 import { turnService } from "../src/services/turnService";
 import { useModelCatalog } from "../src/state/useModelCatalog";
@@ -33,7 +41,7 @@ export default function ChatsScreen(): ReactElement {
   const [search, setSearch] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [attachments, setAttachments] = useState<readonly AttachmentChip[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   useModelCatalog();
   async function send(): Promise<void> {
@@ -41,17 +49,30 @@ export default function ChatsScreen(): ReactElement {
     const selection = currentModel;
     if (value.length === 0 || !selection) {
       if (!selection) {
-        setError("Add a provider and choose a model first.");
+        setNotice("Add a provider and choose a model first.");
       }
       return;
     }
     const separator = selection.id.indexOf(":");
     if (separator <= 0) {
-      setError("That model selection is not usable. Pick it again.");
+      setNotice("That model selection is not usable. Pick it again.");
       return;
     }
 
-    setError(null);
+    const problem = attachmentProblem(attachments, selection);
+    if (problem) {
+      setNotice(problem);
+      return;
+    }
+    let images;
+    try {
+      images = await readImageAttachments(attachments);
+    } catch {
+      setNotice("Could not read the attached image. Try attaching it again.");
+      return;
+    }
+
+    setNotice(null);
     try {
       const sessionId = await createSession({
         title: value.slice(0, 60),
@@ -62,6 +83,7 @@ export default function ChatsScreen(): ReactElement {
       // instead of re-reading an empty session from disk.
       useSessionStore.getState().beginSession(sessionId, value.slice(0, 60), []);
       setText("");
+      setAttachments([]);
       router.push({ pathname: "/session/[id]", params: { id: sessionId } });
       void turnService.send({
         sessionId,
@@ -69,9 +91,10 @@ export default function ChatsScreen(): ReactElement {
         effort: selection.effort,
         text: value,
         think,
+        images,
       });
     } catch {
-      setError("Could not start the chat.");
+      setNotice("Could not start the chat.");
     }
   }
 
@@ -84,7 +107,18 @@ export default function ChatsScreen(): ReactElement {
     if (result.canceled || !asset) {
       return;
     }
-    setAttachments((current) => [...current, { id: asset.uri, name: asset.name }]);
+    const mimeType = asset.mimeType ?? "application/octet-stream";
+    setNotice(null);
+    setAttachments((current) => [
+      ...current,
+      {
+        id: asset.uri,
+        name: asset.name,
+        mimeType,
+        kind: mimeType.startsWith("image/") ? "image" : "document",
+        size: asset.size ?? null,
+      },
+    ]);
   }
 
   function runEmptyAction(key: string): void {
@@ -108,11 +142,14 @@ export default function ChatsScreen(): ReactElement {
       <SessionHeader
         model={currentModel?.label ?? "Select model"}
         effort={currentModel?.effort}
+        vision={currentModel?.vision}
         onOpenDrawer={openDrawer}
         onOpenModelPicker={() => setPickerOpen(true)}
       />
 
       <EmptyState headline="What shall we think through?" actions={EMPTY_ACTIONS} onAction={runEmptyAction} />
+
+      <ComposerNotice message={notice} onDismiss={() => setNotice(null)} />
 
       <Composer
         value={text}
@@ -121,7 +158,10 @@ export default function ChatsScreen(): ReactElement {
         search={search}
         streaming={false}
         attachments={attachments}
-        onRemoveAttachment={(id) => setAttachments((current) => current.filter((item) => item.id !== id))}
+        onRemoveAttachment={(id) => {
+          setNotice(null);
+          setAttachments((current) => current.filter((item) => item.id !== id));
+        }}
         onChangeText={setText}
         onToggleThink={() => setThink((value) => !value)}
         onToggleSearch={() => setSearch((value) => !value)}
@@ -135,13 +175,14 @@ export default function ChatsScreen(): ReactElement {
         onRecord={() => undefined}
       />
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-
       <ModelPickerSheet
         visible={pickerOpen}
         models={models}
         selectedId={currentModel?.id ?? null}
-        onSelect={(model, effort) => selectModel(model, effort)}
+        onSelect={(model, effort) => {
+          setNotice(null);
+          selectModel(model, effort);
+        }}
         onClose={() => setPickerOpen(false)}
       />
       </View>
@@ -152,11 +193,4 @@ export default function ChatsScreen(): ReactElement {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.canvas },
   fill: { flex: 1 },
-  error: {
-    paddingHorizontal: 18,
-    paddingBottom: 8,
-    fontSize: 13,
-    lineHeight: 19,
-    color: colors.danger,
-  },
 });

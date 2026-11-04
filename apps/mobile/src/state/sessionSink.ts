@@ -15,6 +15,7 @@ export function createSessionStoreSink(): TurnSink {
     },
 
     onAssistantStart: (id, reasoningRequested) => {
+      useSessionStore.getState().setStreaming(true);
       useSessionStore.getState().addTurn({
         id,
         role: "assistant",

@@ -5,7 +5,15 @@ import {
   createProviderRepository,
   createTurnEngine,
 } from "@projectx/core";
-import type { FetchLike, ModelInfo, ProviderRuntime, ToolExecutor } from "@projectx/core";
+import type {
+  FetchLike,
+  ModelInfo,
+  PartInput,
+  ProviderRuntime,
+  ToolExecutor,
+} from "@projectx/core";
+
+import type { ImageAttachment } from "./attachments";
 
 import { getDbContext } from "../db/client";
 import { readProviderKey } from "./keyStore";
@@ -56,6 +64,9 @@ export interface TurnInput {
   readonly selectionId: string;
   readonly effort: string;
   readonly think: boolean;
+  readonly images?: readonly ImageAttachment[];
+  /** Re-runs the answer to an existing user message instead of appending a new one. */
+  readonly regenerate?: boolean;
 }
 
 export interface TurnPort {
@@ -115,13 +126,16 @@ export function createTurnPort(sink: TurnSink): TurnPort {
         model,
         provider: runtime,
         system: "",
-        userParts: [{ type: "text", data: { text: input.text } }],
+        effort: input.effort,
+        userParts: input.regenerate ? [] : userParts(input),
         maxOutputTokens: Math.min(model.maxOutput, MAX_OUTPUT_TOKENS),
         signal: controller.signal,
         onEvent: (event) => {
           switch (event.type) {
             case "turn_started":
-              sink.onUserTurn(event.userMessageId ?? `user-${Date.now()}`, input.text);
+              if (event.userMessageId) {
+                sink.onUserTurn(event.userMessageId, input.text);
+              }
               break;
             case "message_started":
               sink.onAssistantStart(event.messageId, input.think);
@@ -161,7 +175,9 @@ export function createTurnPort(sink: TurnSink): TurnPort {
         sink.onError(result.error.userMessage);
       }
     } catch (failure) {
-      sink.onError(describe(failure));
+      if (!controller?.signal.aborted) {
+        sink.onError(describe(failure));
+      }
     } finally {
       controller = null;
       sink.onSettled();
@@ -173,6 +189,23 @@ export function createTurnPort(sink: TurnSink): TurnPort {
     stop: () => controller?.abort(),
     isRunning: () => controller !== null,
   };
+}
+
+/** Text first, then one attachment part per image so history can rebuild vision input. */
+function userParts(input: TurnInput): PartInput[] {
+  const parts: PartInput[] = [{ type: "text", data: { text: input.text } }];
+  for (const image of input.images ?? []) {
+    parts.push({
+      type: "attachment",
+      data: {
+        kind: "image",
+        name: image.name,
+        mimeType: image.mimeType,
+        data: image.base64,
+      },
+    });
+  }
+  return parts;
 }
 
 async function findModel(models: readonly ModelInfo[], modelId: string): Promise<ModelInfo> {

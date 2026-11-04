@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   PRESETS,
+  applyKnownCapabilities,
   createProviderConfig,
   getPreset,
   knownModels,
+  mergeFetchedModels,
   mergeModels,
 } from "../registry";
 
@@ -77,5 +79,38 @@ describe("provider registry", () => {
     const models = mergeModels(config, ["claude-haiku-5-5", "unknown-go-model"]);
     expect(models[0]?.protocol).toBe("anthropic");
     expect(models[1]?.protocol).toBe("openai-chat");
+  });
+
+  it("takes catalog capabilities without losing curated routing", () => {
+    const config = createProviderConfig("opencode-go");
+    const models = mergeFetchedModels(config, [
+      { id: "deepseek-v4.1-flash", vision: true, contextWindow: 1_000_000 },
+    ]);
+
+    expect(models[0]?.protocol).toBe("openai-chat");
+    expect(models[0]?.endpoint).toBe("https://opencode.ai/inference/go/openai/v1/chat/completions");
+    expect(models[0]?.capabilities.vision).toBe(true);
+    expect(models[0]?.contextWindow).toBe(1_000_000);
+  });
+
+  it("heals cached models whose capabilities predate the catalog metadata", () => {
+    const curated = knownModels("opencode-go").find(
+      (model) => model.id === "deepseek-v4.1-flash",
+    );
+    if (!curated) {
+      throw new Error("missing fixture model");
+    }
+    const stale = {
+      ...curated,
+      capabilities: { ...curated.capabilities, vision: false },
+    };
+
+    const [healed] = applyKnownCapabilities("opencode-go", [stale]);
+    const unknown = applyKnownCapabilities("opencode-go", [
+      { ...stale, id: "future-model" },
+    ]);
+
+    expect(healed?.capabilities.vision).toBe(true);
+    expect(unknown[0]?.capabilities.vision).toBe(false);
   });
 });
