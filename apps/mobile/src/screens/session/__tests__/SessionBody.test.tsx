@@ -69,6 +69,26 @@ describe("SessionBody", () => {
     expect(screen.getByLabelText("Attached revenue-chart.png")).toBeTruthy();
   });
 
+  it("drops the thinking label once reasoning has streamed", async () => {
+    await renderBody(
+      [
+        {
+          id: "a1",
+          role: "assistant",
+          text: "",
+          status: "streaming",
+          reasoningRequested: true,
+          reasoning: "Checked the chart.",
+        },
+      ],
+      null,
+      true,
+    );
+
+    expect(screen.getByText("Thought")).toBeTruthy();
+    expect(screen.queryByText("Thinking…")).toBeNull();
+  });
+
   it("calls back when regenerate is pressed", async () => {
     const onRegenerate = jest.fn();
     await render(

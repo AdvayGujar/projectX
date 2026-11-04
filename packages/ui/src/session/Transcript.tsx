@@ -69,7 +69,7 @@ export function Transcript({
               />
             ) : null}
 
-            {turn.status === "streaming" && turn.text.length === 0 ? (
+            {turn.status === "streaming" && turn.text.length === 0 && !turn.reasoning ? (
               <Text style={styles.thinking}>{streamingLabel(turn.reasoningRequested)}</Text>
             ) : null}
 
