@@ -1,5 +1,5 @@
 import type { AttachmentChip, SourceRef } from "@projectx/ui";
-import { ModelPickerSheet, SessionMenu, SourcesSheet, colors } from "@projectx/ui";
+import { ComposerNotice, ModelPickerSheet, SessionMenu, SourcesSheet, colors } from "@projectx/ui";
 import * as DocumentPicker from "expo-document-picker";
 import { useLocalSearchParams } from "expo-router";
 import * as Speech from "expo-speech";
@@ -45,6 +45,7 @@ export default function SessionScreen(): ReactElement {
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [attachments, setAttachments] = useState<readonly AttachmentChip[]>([]);
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     if (sessionId.length === 0 || activeSessionId === sessionId) {
@@ -84,17 +85,18 @@ export default function SessionScreen(): ReactElement {
     }
     const problem = attachmentProblem(attachments, currentModel);
     if (problem) {
-      setError(problem);
+      setNotice(problem);
       return;
     }
     let images;
     try {
       images = await readImageAttachments(attachments);
     } catch {
-      setError("Could not read the attached image. Try attaching it again.");
+      setNotice("Could not read the attached image. Try attaching it again.");
       return;
     }
     setError(null);
+    setNotice(null);
     setText("");
     setAttachments([]);
     void turnService.send({
@@ -117,6 +119,7 @@ export default function SessionScreen(): ReactElement {
       return;
     }
     const mimeType = asset.mimeType ?? "application/octet-stream";
+    setNotice(null);
     setAttachments((current) => [
       ...current,
       {
@@ -188,6 +191,7 @@ export default function SessionScreen(): ReactElement {
         <SessionTopBar
         modelLabel={currentModel?.label ?? "Select model"}
         effort={currentModel?.effort}
+        vision={currentModel?.vision}
         onOpenDrawer={openDrawer}
         onOpenModelPicker={() => setPickerOpen(true)}
         onOpenMenu={() => setMenuOpen(true)}
@@ -204,6 +208,8 @@ export default function SessionScreen(): ReactElement {
         onOpenSources={() => setSourcesOpen(true)}
       />
 
+      <ComposerNotice message={notice} onDismiss={() => setNotice(null)} />
+
       <SessionComposerSection
         text={text}
         think={think}
@@ -217,9 +223,10 @@ export default function SessionScreen(): ReactElement {
         onAttach={() => {
           void attach();
         }}
-        onRemoveAttachment={(id) =>
-          setAttachments((current) => current.filter((item) => item.id !== id))
-        }
+        onRemoveAttachment={(id) => {
+          setNotice(null);
+          setAttachments((current) => current.filter((item) => item.id !== id));
+        }}
         onSend={() => {
           void send();
         }}
@@ -245,7 +252,10 @@ export default function SessionScreen(): ReactElement {
         visible={pickerOpen}
         models={models}
         selectedId={currentModel?.id ?? null}
-        onSelect={(model, effort) => selectModel(model, effort)}
+        onSelect={(model, effort) => {
+          setNotice(null);
+          selectModel(model, effort);
+        }}
         onClose={() => setPickerOpen(false)}
       />
       </View>

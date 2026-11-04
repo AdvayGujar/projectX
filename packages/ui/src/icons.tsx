@@ -20,6 +20,7 @@ export const ICON_NAMES = [
   "layers",
   "attach",
   "slides",
+  "image",
   "think",
   "chevron",
   "send",
@@ -100,6 +101,13 @@ export function Icon({ name, color, size = 18, strokeWidth = 1.7 }: IconProps): 
         <>
           <Rect x="3.5" y="5" width="17" height="11" rx="1.4" />
           <Path d="M12 16v3.5M8 21h8" />
+        </>
+      )}
+      {name === "image" && (
+        <>
+          <Rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+          <Circle cx="9" cy="9.5" r="1.4" fill={color} stroke="none" />
+          <Path d="M4.5 17.5 9 13l3.5 3.5 2.5-2.5 4.5 4.5" />
         </>
       )}
       {name === "think" && <Path d="M12 4.5v15M4.5 12h15M7 7l10 10M17 7 7 17" />}

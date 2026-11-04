@@ -1,6 +1,9 @@
 export { Composer } from "./composer/Composer";
 export type { ComposerProps } from "./composer/Composer";
 
+export { ComposerNotice } from "./composer/ComposerNotice";
+export type { ComposerNoticeProps } from "./composer/ComposerNotice";
+
 export { DrawerContent } from "./drawer/DrawerContent";
 export type { DrawerContentProps } from "./drawer/DrawerContent";
 
