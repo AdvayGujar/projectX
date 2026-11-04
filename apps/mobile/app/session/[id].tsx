@@ -9,6 +9,7 @@ import { KeyboardAvoidingView, Platform, StyleSheet, View } from "react-native";
 
 import { useOpenDrawer } from "../../src/navigation/useOpenDrawer";
 import { SessionBody } from "../../src/screens/session/SessionBody";
+import { attachmentProblem, readImageAttachments } from "../../src/services/attachments";
 import { SessionComposerSection } from "../../src/screens/session/SessionComposerSection";
 import { SessionTopBar } from "../../src/screens/session/SessionTopBar";
 import { loadSession } from "../../src/services/sessionQueries";
@@ -72,7 +73,7 @@ export default function SessionScreen(): ReactElement {
     [turns],
   );
 
-  function send(): void {
+  async function send(): Promise<void> {
     const value = text.trim();
     if (value.length === 0 || streaming) {
       return;
@@ -81,13 +82,28 @@ export default function SessionScreen(): ReactElement {
       setError("Choose a model before sending.");
       return;
     }
+    const problem = attachmentProblem(attachments, currentModel);
+    if (problem) {
+      setError(problem);
+      return;
+    }
+    let images;
+    try {
+      images = await readImageAttachments(attachments);
+    } catch {
+      setError("Could not read the attached image. Try attaching it again.");
+      return;
+    }
+    setError(null);
     setText("");
+    setAttachments([]);
     void turnService.send({
       sessionId,
       selectionId: currentModel.id,
       effort: currentModel.effort,
       text: value,
       think,
+      images,
     });
   }
 
@@ -100,7 +116,17 @@ export default function SessionScreen(): ReactElement {
     if (result.canceled || !asset) {
       return;
     }
-    setAttachments((current) => [...current, { id: asset.uri, name: asset.name }]);
+    const mimeType = asset.mimeType ?? "application/octet-stream";
+    setAttachments((current) => [
+      ...current,
+      {
+        id: asset.uri,
+        name: asset.name,
+        mimeType,
+        kind: mimeType.startsWith("image/") ? "image" : "document",
+        size: asset.size ?? null,
+      },
+    ]);
   }
 
   function readAloud(turnId: string): void {
@@ -161,7 +187,9 @@ export default function SessionScreen(): ReactElement {
         onRemoveAttachment={(id) =>
           setAttachments((current) => current.filter((item) => item.id !== id))
         }
-        onSend={send}
+        onSend={() => {
+          void send();
+        }}
         onStop={() => turnService.stop()}
         onRecord={() => undefined}
       />

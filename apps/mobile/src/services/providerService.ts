@@ -107,6 +107,7 @@ export async function listAvailableModels(): Promise<ModelOption[]> {
           provider: provider.label,
           effort: model.capabilities.reasoning ? "Medium" : "Standard",
           reasoning: model.capabilities.reasoning,
+          vision: model.capabilities.vision,
         }));
       }),
   );

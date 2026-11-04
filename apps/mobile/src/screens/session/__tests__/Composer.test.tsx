@@ -57,7 +57,15 @@ describe("Composer", () => {
     await render(
       <Composer
         {...props({
-          attachments: [{ id: "a1", name: "roadmap.docx" }],
+          attachments: [
+            {
+              id: "a1",
+              name: "roadmap.docx",
+              mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              kind: "document",
+              size: 1_024,
+            },
+          ],
           onRemoveAttachment,
         })}
       />,

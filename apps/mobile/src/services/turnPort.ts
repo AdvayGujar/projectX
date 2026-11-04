@@ -5,7 +5,15 @@ import {
   createProviderRepository,
   createTurnEngine,
 } from "@projectx/core";
-import type { FetchLike, ModelInfo, ProviderRuntime, ToolExecutor } from "@projectx/core";
+import type {
+  FetchLike,
+  ModelInfo,
+  PartInput,
+  ProviderRuntime,
+  ToolExecutor,
+} from "@projectx/core";
+
+import type { ImageAttachment } from "./attachments";
 
 import { getDbContext } from "../db/client";
 import { readProviderKey } from "./keyStore";
@@ -56,6 +64,7 @@ export interface TurnInput {
   readonly selectionId: string;
   readonly effort: string;
   readonly think: boolean;
+  readonly images?: readonly ImageAttachment[];
 }
 
 export interface TurnPort {
@@ -116,7 +125,7 @@ export function createTurnPort(sink: TurnSink): TurnPort {
         provider: runtime,
         system: "",
         effort: input.effort,
-        userParts: [{ type: "text", data: { text: input.text } }],
+        userParts: userParts(input),
         maxOutputTokens: Math.min(model.maxOutput, MAX_OUTPUT_TOKENS),
         signal: controller.signal,
         onEvent: (event) => {
@@ -174,6 +183,23 @@ export function createTurnPort(sink: TurnSink): TurnPort {
     stop: () => controller?.abort(),
     isRunning: () => controller !== null,
   };
+}
+
+/** Text first, then one attachment part per image so history can rebuild vision input. */
+function userParts(input: TurnInput): PartInput[] {
+  const parts: PartInput[] = [{ type: "text", data: { text: input.text } }];
+  for (const image of input.images ?? []) {
+    parts.push({
+      type: "attachment",
+      data: {
+        kind: "image",
+        name: image.name,
+        mimeType: image.mimeType,
+        data: image.base64,
+      },
+    });
+  }
+  return parts;
 }
 
 async function findModel(models: readonly ModelInfo[], modelId: string): Promise<ModelInfo> {
