@@ -181,6 +181,14 @@ export function createMessageRepository({ db, ids, now }: DbContext) {
       return { ...mapMessage(row as unknown as MessageRow), parts: parts.get(id) ?? [] };
     },
 
+    async removeAfter(sessionId: string, seq: number): Promise<void> {
+      try {
+        await db.execute("DELETE FROM messages WHERE session_id = ? AND seq > ?", [sessionId, seq]);
+      } catch (error) {
+        throw toDbError(error, "Could not remove later messages.");
+      }
+    },
+
     async count(sessionId: string): Promise<number> {
       const result = await db.execute(
         "SELECT COUNT(*) AS count FROM messages WHERE session_id = ?",

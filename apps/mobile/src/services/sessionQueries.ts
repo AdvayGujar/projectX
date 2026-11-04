@@ -1,8 +1,9 @@
-import type { ModelPricing } from "@projectx/core";
+import type { ModelPricing, RegenerationTarget } from "@projectx/core";
 import {
   createMessageRepository,
   createProviderRepository,
   createSessionRepository,
+  prepareRegeneration as prepareRegenerationInDatabase,
 } from "@projectx/core";
 import type { MessageWithParts, Part } from "@projectx/core";
 import type { TurnCost, ViewTurn } from "@projectx/ui";
@@ -50,6 +51,15 @@ export async function createSession(input: {
     modelId: input.modelId,
   });
   return session.id;
+}
+
+/** Prepares the latest reply for regeneration and removes it from the session. */
+export async function prepareRegeneration(
+  sessionId: string,
+  assistantMessageId: string,
+): Promise<RegenerationTarget | null> {
+  const context = await getDbContext();
+  return prepareRegenerationInDatabase(context, sessionId, assistantMessageId);
 }
 
 /** Reads a session and maps stored messages/parts into view turns. */
