@@ -31,6 +31,11 @@ describe("regeneration", () => {
       text: "Explain the report",
     });
     expect((await messages.list(session.id)).map((message) => message.id)).toEqual([user.id]);
+    expect(await messages.get(assistant.id)).toBeNull();
+    const parts = await ctx.db.execute("SELECT COUNT(*) AS count FROM parts WHERE message_id = ?", [
+      assistant.id,
+    ]);
+    expect(Number(parts.rows[0]?.count)).toBe(0);
   }));
 
   it("refuses to regenerate a reply that is no longer the latest", () => withContext(async (ctx) => {
