@@ -8,6 +8,7 @@ function props(overrides: Partial<Parameters<typeof Composer>[0]> = {}) {
     placeholder: "Ask me. Task me.",
     think: true,
     search: false,
+    streaming: false,
     attachments: [],
     onChangeText: () => undefined,
     onToggleThink: () => undefined,
@@ -15,6 +16,7 @@ function props(overrides: Partial<Parameters<typeof Composer>[0]> = {}) {
     onAttach: () => undefined,
     onRemoveAttachment: () => undefined,
     onSend: () => undefined,
+    onStop: () => undefined,
     onRecord: () => undefined,
     ...overrides,
   };
@@ -36,6 +38,18 @@ describe("Composer", () => {
 
     await view.rerender(<Composer {...props({ value: "hello" })} />);
     expect(screen.getByLabelText("Send")).toBeTruthy();
+  });
+
+  it("offers stop instead of send while a turn is streaming", async () => {
+    const onStop = jest.fn();
+    await render(
+      <Composer {...props({ value: "hello", streaming: true, onStop })} />,
+    );
+
+    expect(screen.queryByLabelText("Send")).toBeNull();
+    fireEvent.press(screen.getByLabelText("Stop"));
+
+    expect(onStop).toHaveBeenCalledTimes(1);
   });
 
   it("lists an attachment and removes it", async () => {

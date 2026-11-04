@@ -15,11 +15,13 @@ export interface ComposerProps {
   readonly placeholder: string;
   readonly think: boolean;
   readonly search: boolean;
+  readonly streaming: boolean;
   readonly onChangeText: (value: string) => void;
   readonly onToggleThink: () => void;
   readonly onToggleSearch: () => void;
   readonly onAttach: () => void;
   readonly onSend: () => void;
+  readonly onStop: () => void;
   readonly onRecord: () => void;
 }
 
@@ -34,16 +36,18 @@ export function Composer({
   placeholder,
   think,
   search,
+  streaming,
   onChangeText,
   onToggleThink,
   onToggleSearch,
   onAttach,
   onSend,
+  onStop,
   onRecord,
 }: ComposerProps): ReactElement {
   const insets = useSafeAreaInsets();
   const keyboardVisible = useKeyboardVisible();
-  const canSend = value.trim().length > 0;
+  const canSend = value.trim().length > 0 && !streaming;
 
   return (
     <View
@@ -100,15 +104,27 @@ export function Composer({
             returnKeyType="send"
           />
 
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={canSend ? "Send" : "Record"}
-            hitSlop={HIT_SLOP}
-            onPress={canSend ? onSend : onRecord}
-            style={styles.record}
-          >
-            <Icon name={canSend ? "send" : "record"} size={18} color={colors.canvas} />
-          </Pressable>
+          {streaming ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Stop"
+              hitSlop={HIT_SLOP}
+              onPress={onStop}
+              style={styles.record}
+            >
+              <Icon name="stop" size={18} color={colors.canvas} />
+            </Pressable>
+          ) : (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={canSend ? "Send" : "Record"}
+              hitSlop={HIT_SLOP}
+              onPress={canSend ? onSend : onRecord}
+              style={styles.record}
+            >
+              <Icon name={canSend ? "send" : "record"} size={18} color={colors.canvas} />
+            </Pressable>
+          )}
         </View>
       </View>
     </View>

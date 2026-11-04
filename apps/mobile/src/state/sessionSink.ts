@@ -9,7 +9,9 @@ import { useSessionsStore } from "./sessionsStore";
 export function createSessionStoreSink(): TurnSink {
   return {
     onUserTurn: (id, text) => {
-      useSessionStore.getState().addTurn({ id, role: "user", text });
+      const store = useSessionStore.getState();
+      store.setStreaming(true);
+      store.addTurn({ id, role: "user", text });
     },
 
     onAssistantStart: (id, reasoningRequested) => {
