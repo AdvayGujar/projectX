@@ -191,7 +191,6 @@ export default function SessionScreen(): ReactElement {
         <SessionTopBar
         modelLabel={currentModel?.label ?? "Select model"}
         effort={currentModel?.effort}
-        vision={currentModel?.vision}
         onOpenDrawer={openDrawer}
         onOpenModelPicker={() => setPickerOpen(true)}
         onOpenMenu={() => setMenuOpen(true)}

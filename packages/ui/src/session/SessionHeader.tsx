@@ -7,7 +7,6 @@ import { colors, HIT_SLOP, radius, space, typography } from "../theme";
 export interface SessionHeaderProps {
   readonly model: string;
   readonly effort?: string;
-  readonly vision?: boolean;
   readonly onOpenDrawer: () => void;
   readonly onOpenModelPicker: () => void;
   readonly onOpenMenu?: () => void;
@@ -20,7 +19,6 @@ export interface SessionHeaderProps {
 export function SessionHeader({
   model,
   effort,
-  vision,
   onOpenDrawer,
   onOpenMenu,
   onOpenModelPicker,
@@ -40,13 +38,12 @@ export function SessionHeader({
       <View style={styles.center}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Model: ${model}${vision ? ", supports images" : ""}${effort ? `, effort ${effort}` : ""}`}
+          accessibilityLabel={`Model: ${model}${effort ? `, effort ${effort}` : ""}`}
           hitSlop={HIT_SLOP}
           onPress={onOpenModelPicker}
           style={styles.pill}
         >
           <Text style={styles.model}>{model}</Text>
-          {vision ? <Icon name="image" size={12} color={colors.textMuted} /> : null}
           {effort ? <Text style={styles.effort}>· {effort}</Text> : null}
         </Pressable>
       </View>
