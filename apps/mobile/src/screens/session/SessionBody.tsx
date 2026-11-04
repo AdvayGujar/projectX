@@ -1,4 +1,4 @@
-import type { ViewTurn } from "@projectx/ui";
+import type { TurnAttachment, ViewTurn } from "@projectx/ui";
 import { Transcript, colors } from "@projectx/ui";
 import type { ReactElement } from "react";
 import { useRef } from "react";
@@ -9,6 +9,7 @@ export interface SessionBodyProps {
   readonly error: string | null;
   readonly streaming: boolean;
   readonly onRegenerate: (turnId: string) => void;
+  readonly onOpenAttachment: (turnId: string, attachment: TurnAttachment) => void;
   readonly onReadAloud: (turnId: string) => void;
   readonly onOpenSources: () => void;
 }
@@ -19,6 +20,7 @@ export function SessionBody({
   error,
   streaming,
   onRegenerate,
+  onOpenAttachment,
   onReadAloud,
   onOpenSources,
 }: SessionBodyProps): ReactElement {
@@ -37,6 +39,7 @@ export function SessionBody({
           turns={turns}
           onCopy={() => undefined}
           onRegenerate={onRegenerate}
+          onOpenAttachment={onOpenAttachment}
           onReadAloud={onReadAloud}
           onOpenSources={onOpenSources}
         />

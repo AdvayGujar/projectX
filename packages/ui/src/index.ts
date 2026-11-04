@@ -45,6 +45,9 @@ export type { SourcesSheetProps } from "./session/SourcesSheet";
 export { Thought } from "./session/Thought";
 export type { ThoughtProps } from "./session/Thought";
 
+export { AttachmentViewer } from "./session/AttachmentViewer";
+export type { AttachmentPreview, AttachmentViewerProps } from "./session/AttachmentViewer";
+
 export { Transcript } from "./session/Transcript";
 export type { TranscriptProps } from "./session/Transcript";
 

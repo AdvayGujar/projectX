@@ -29,6 +29,8 @@ export interface TurnArtifact {
 
 /** What was attached to a user turn. The bytes stay in storage, not in the transcript. */
 export interface TurnAttachment {
+  /** Position among the message's attachment parts, used to fetch the bytes lazily. */
+  readonly index: number;
   readonly name: string;
   readonly mimeType: string;
   readonly kind: "image" | "document";

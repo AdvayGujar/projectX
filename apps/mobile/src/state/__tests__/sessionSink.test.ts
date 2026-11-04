@@ -24,11 +24,11 @@ describe("session sink", () => {
 
   it("keeps attachment names on the user turn", () => {
     sink.onUserTurn("user-1", "look", [
-      { name: "photo.png", mimeType: "image/png", kind: "image" },
+      { index: 0, name: "photo.png", mimeType: "image/png", kind: "image" },
     ]);
 
     expect(store().turns[0]?.attachments).toEqual([
-      { name: "photo.png", mimeType: "image/png", kind: "image" },
+      { index: 0, name: "photo.png", mimeType: "image/png", kind: "image" },
     ]);
   });
 

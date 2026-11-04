@@ -1,5 +1,12 @@
 import type { AttachmentChip, SourceRef } from "@projectx/ui";
-import { ComposerNotice, ModelPickerSheet, SessionMenu, SourcesSheet, colors } from "@projectx/ui";
+import {
+  AttachmentViewer,
+  ComposerNotice,
+  ModelPickerSheet,
+  SessionMenu,
+  SourcesSheet,
+  colors,
+} from "@projectx/ui";
 import * as DocumentPicker from "expo-document-picker";
 import { useLocalSearchParams } from "expo-router";
 import * as Speech from "expo-speech";
@@ -12,7 +19,12 @@ import { SessionBody } from "../../src/screens/session/SessionBody";
 import { attachmentProblem, readImageAttachments } from "../../src/services/attachments";
 import { SessionComposerSection } from "../../src/screens/session/SessionComposerSection";
 import { SessionTopBar } from "../../src/screens/session/SessionTopBar";
-import { loadSession, prepareRegeneration } from "../../src/services/sessionQueries";
+import {
+  loadAttachment,
+  loadSession,
+  prepareRegeneration,
+  type LoadedAttachment,
+} from "../../src/services/sessionQueries";
 import { turnService } from "../../src/services/turnService";
 import { useModelCatalog } from "../../src/state/useModelCatalog";
 import { useModelStore } from "../../src/state/modelStore";
@@ -46,6 +58,7 @@ export default function SessionScreen(): ReactElement {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [attachments, setAttachments] = useState<readonly AttachmentChip[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
+  const [viewer, setViewer] = useState<LoadedAttachment | null>(null);
 
   useEffect(() => {
     if (sessionId.length === 0 || activeSessionId === sessionId) {
@@ -162,6 +175,23 @@ export default function SessionScreen(): ReactElement {
     }
   }
 
+  async function openAttachment(turnId: string, index: number): Promise<void> {
+    try {
+      const loaded = await loadAttachment(turnId, index);
+      if (!loaded) {
+        setNotice("That attachment is no longer available.");
+        return;
+      }
+      if (loaded.kind !== "image" || !loaded.base64) {
+        setNotice("Preview is only available for images right now.");
+        return;
+      }
+      setViewer(loaded);
+    } catch {
+      setNotice("Could not open the attachment.");
+    }
+  }
+
   function readAloud(turnId: string): void {
     if (muted) {
       return;
@@ -202,6 +232,9 @@ export default function SessionScreen(): ReactElement {
         streaming={streaming}
         onRegenerate={(turnId) => {
           void regenerate(turnId);
+        }}
+        onOpenAttachment={(turnId, attachment) => {
+          void openAttachment(turnId, attachment.index);
         }}
         onReadAloud={readAloud}
         onOpenSources={() => setSourcesOpen(true)}
@@ -246,6 +279,8 @@ export default function SessionScreen(): ReactElement {
       />
 
       <SourcesSheet visible={sourcesOpen} sources={sources} onClose={() => setSourcesOpen(false)} />
+
+      <AttachmentViewer attachment={viewer} onClose={() => setViewer(null)} />
 
       <ModelPickerSheet
         visible={pickerOpen}
