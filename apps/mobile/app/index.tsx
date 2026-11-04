@@ -119,6 +119,7 @@ export default function ChatsScreen(): ReactElement {
         placeholder="Ask me. Task me."
         think={think}
         search={search}
+        streaming={false}
         attachments={attachments}
         onRemoveAttachment={(id) => setAttachments((current) => current.filter((item) => item.id !== id))}
         onChangeText={setText}
@@ -130,6 +131,7 @@ export default function ChatsScreen(): ReactElement {
         onSend={() => {
           void send();
         }}
+        onStop={() => undefined}
         onRecord={() => undefined}
       />
 

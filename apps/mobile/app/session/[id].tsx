@@ -149,6 +149,7 @@ export default function SessionScreen(): ReactElement {
         text={text}
         think={think}
         search={search}
+        streaming={streaming}
         attachments={attachments}
         usage={usage}
         onChangeText={setText}
@@ -161,6 +162,7 @@ export default function SessionScreen(): ReactElement {
           setAttachments((current) => current.filter((item) => item.id !== id))
         }
         onSend={send}
+        onStop={() => turnService.stop()}
         onRecord={() => undefined}
       />
 
