@@ -17,10 +17,10 @@ export const useModelStore = create<ModelState>((set) => ({
   current: null,
   setModels: (models) =>
     set((state) => {
-      const current =
-        state.current && models.some((model) => model.id === state.current?.id)
-          ? state.current
-          : (models[0] ?? null);
+      const refreshed = models.find((model) => model.id === state.current?.id);
+      const current = refreshed
+        ? { ...refreshed, effort: state.current?.effort ?? refreshed.effort }
+        : (models[0] ?? null);
       return { models, current };
     }),
   select: (model, effort) =>

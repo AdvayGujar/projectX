@@ -2,6 +2,7 @@ import type { FetchLike, ModelInfo, ProviderRecord } from "@projectx/core";
 import type { ModelOption } from "@projectx/ui";
 import {
   AppError,
+  applyKnownCapabilities,
   createProviderConfig,
   createProviderRepository,
   listProviderModels,
@@ -100,7 +101,8 @@ export async function listAvailableModels(): Promise<ModelOption[]> {
     providers
       .filter((provider) => provider.enabled)
       .map(async (provider) => {
-        const models = await repository.listModels(provider.id);
+        const cached = await repository.listModels(provider.id);
+        const models = applyKnownCapabilities(provider.presetId, cached);
         return models.map((model): ModelOption => ({
           id: `${provider.id}:${model.id}`,
           label: model.label,

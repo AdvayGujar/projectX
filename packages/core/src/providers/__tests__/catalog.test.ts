@@ -19,7 +19,18 @@ describe("provider catalog", () => {
       url = input;
       init = requestInit;
       return jsonResponse({
-        data: [{ id: "deepseek-v4.1-flash" }, { id: "claude-haiku-5-5" }, { id: "gpt-6-luna" }],
+        data: [
+          {
+            id: "deepseek-v4.1-flash",
+            name: "DeepSeek V4.1 Flash",
+            modalities: { input: ["text", "image/png"] },
+            capabilities: { tools: { supported: true }, reasoning: { supported: true } },
+            limit: { context: 1_000_000, output: 384_000 },
+          },
+          { id: "deepseek-v4-pro", modalities: { input: ["text"] } },
+          { id: "claude-haiku-5-5" },
+          { id: "gpt-6-luna" },
+        ],
       });
     };
 
@@ -33,6 +44,36 @@ describe("provider catalog", () => {
     expect(init?.headers?.Authorization).toBe("Bearer go-key");
     expect(models.find((model) => model.id === "claude-haiku-5-5")?.protocol).toBe("anthropic");
     expect(models.find((model) => model.id === "gpt-6-luna")?.protocol).toBe("openai-responses");
+  });
+
+  it("takes vision and limits from the Go catalog modalities", async () => {
+    const fetchImpl: FetchLike = async () =>
+      jsonResponse({
+        data: [
+          {
+            id: "deepseek-v4.1-flash",
+            name: "DeepSeek V4.1 Flash",
+            modalities: { input: ["text", "image/jpeg", "image/png"] },
+            capabilities: { tools: { supported: true }, reasoning: { supported: true } },
+            limit: { context: 1_000_000, output: 384_000 },
+          },
+          { id: "deepseek-v4-pro", modalities: { input: ["text"] } },
+        ],
+      });
+
+    const models = await listProviderModels(
+      createProviderConfig("opencode-go"),
+      "go-key",
+      fetchImpl,
+    );
+    const flash = models.find((model) => model.id === "deepseek-v4.1-flash");
+    const pro = models.find((model) => model.id === "deepseek-v4-pro");
+
+    expect(flash?.capabilities.vision).toBe(true);
+    expect(flash?.contextWindow).toBe(1_000_000);
+    expect(flash?.maxOutput).toBe(384_000);
+    expect(flash?.label).toBe("DeepSeek V4.1 Flash");
+    expect(pro?.capabilities.vision).toBe(false);
   });
 
   it("falls back to known Go models when the catalog is unavailable", async () => {

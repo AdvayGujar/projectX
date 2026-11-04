@@ -6,12 +6,15 @@ export { createOpenAiChatAdapter } from "./openaiChat";
 export { createOpenAiResponsesAdapter } from "./openaiResponses";
 export {
   PRESETS,
+  applyKnownCapabilities,
   createProviderConfig,
   getPreset,
   knownModels,
+  mergeFetchedModels,
   mergeModels,
 } from "./registry";
 export type {
+  FetchedModelInfo,
   ProviderConfigOverrides,
   ProviderPreset,
 } from "./registry";
