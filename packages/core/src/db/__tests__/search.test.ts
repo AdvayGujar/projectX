@@ -155,5 +155,7 @@ describe("search repository", () => {
     expect(await search.chunks("keyword")).toHaveLength(2);
     const hits = await search.chunks("keyword", { projectId: project.id });
     expect(hits.map((hit) => hit.fileId)).toEqual(["grouped"]);
+    const standalone = await search.chunks("keyword", { projectId: null });
+    expect(standalone.map((hit) => hit.fileId)).toEqual(["loose"]);
   }));
 });

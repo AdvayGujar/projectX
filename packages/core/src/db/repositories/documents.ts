@@ -102,9 +102,14 @@ function buildUpdate(
   if (patch.status !== undefined) {
     fields.push("status = ?");
     params.push(patch.status);
-    if (patch.status === "ready" && patch.extractedAt === undefined) {
-      fields.push("extracted_at = ?");
-      params.push(timestamp);
+    if (patch.status === "ready") {
+      if (patch.extractedAt === undefined) {
+        fields.push("extracted_at = ?");
+        params.push(timestamp);
+      }
+      if (patch.error === undefined) {
+        fields.push("error = NULL");
+      }
     }
   }
   if (patch.pageCount !== undefined) {

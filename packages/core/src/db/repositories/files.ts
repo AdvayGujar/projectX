@@ -1,6 +1,9 @@
 import { AppError } from "../../errors";
-import type { DbContext, FileKind, FileRecord } from "../types";
+import { assertSafeRelativePath } from "../../paths";
+import type { DbContext, DocumentRecord, FileKind, FileRecord, SqlCommand, SqlValue } from "../types";
 import { toDbError } from "./errors";
+
+const FILE_COLUMNS = "id, session_id, name, mime, size, path, kind, created_at";
 
 interface FileRow {
   id: string;
@@ -26,35 +29,49 @@ export interface AddFileInput {
   readonly kind: FileKind;
 }
 
-export function createFileRepository({ db, now }: DbContext) {
+export interface FileWithDocument {
+  readonly file: FileRecord;
+  readonly document: DocumentRecord;
+}
+
+export function createFileRepository({ db, ids, now }: DbContext) {
   return {
     async add(input: AddFileInput): Promise<FileRecord> {
-      const id = requireValue(input.id, "File id");
-      const sessionId = requireValue(input.sessionId, "Session id");
-      const name = normalizeName(input.name);
-      const mime = requireValue(input.mime, "MIME type");
-      const path = requireValue(input.path, "File path");
-      const size = normalizeSize(input.size);
-      const createdAt = now();
+      const file = normalizeFile(input, now());
       try {
         await db.execute(
-          `INSERT INTO files (id, session_id, name, mime, size, path, kind, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [id, sessionId, name, mime, size, path, input.kind, createdAt],
+          `INSERT INTO files (${FILE_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          fileParams(file),
         );
       } catch (error) {
         throw toDbError(error, "Could not save the file.");
       }
-      return {
-        id,
-        sessionId,
-        name,
-        mime,
-        size,
-        path,
-        kind: input.kind,
-        createdAt,
-      };
+      return file;
+    },
+
+    /**
+     * Import is the only caller. One transaction keeps a file from existing without the
+     * pending document row that extraction depends on.
+     */
+    async addWithDocument(input: AddFileInput): Promise<FileWithDocument> {
+      const file = normalizeFile(input, now());
+      const document = pendingDocument(ids(), file.id);
+      const commands: SqlCommand[] = [
+        [
+          `INSERT INTO files (${FILE_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          fileParams(file),
+        ],
+        [
+          "INSERT INTO documents (id, file_id, status) VALUES (?, ?, 'pending')",
+          [document.id, file.id],
+        ],
+      ];
+      try {
+        await db.executeBatch(commands);
+      } catch (error) {
+        throw toDbError(error, "Could not save the file.");
+      }
+      return { file, document };
     },
 
     async get(id: string): Promise<FileRecord | null> {
@@ -83,12 +100,61 @@ export function createFileRepository({ db, now }: DbContext) {
     },
 
     async remove(id: string): Promise<void> {
-      await db.execute("DELETE FROM files WHERE id = ?", [id]);
+      try {
+        await db.execute("DELETE FROM files WHERE id = ?", [id]);
+      } catch (error) {
+        throw toDbError(error, "Could not remove the file.");
+      }
     },
   };
 }
 
 export type FileRepository = ReturnType<typeof createFileRepository>;
+
+function normalizeFile(input: AddFileInput, createdAt: number): FileRecord {
+  const id = requireValue(input.id, "File id");
+  const sessionId = requireValue(input.sessionId, "Session id");
+  const name = normalizeName(input.name);
+  const mime = requireValue(input.mime, "MIME type");
+  const path = requireValue(input.path, "File path");
+  assertSafeRelativePath(path);
+  return {
+    id,
+    sessionId,
+    name,
+    mime,
+    size: normalizeSize(input.size),
+    path,
+    kind: input.kind,
+    createdAt,
+  };
+}
+
+function fileParams(file: FileRecord): SqlValue[] {
+  return [
+    file.id,
+    file.sessionId,
+    file.name,
+    file.mime,
+    file.size,
+    file.path,
+    file.kind,
+    file.createdAt,
+  ];
+}
+
+function pendingDocument(id: string, fileId: string): DocumentRecord {
+  return {
+    id,
+    fileId,
+    pageCount: null,
+    slideCount: null,
+    sheetCount: null,
+    status: "pending",
+    error: null,
+    extractedAt: null,
+  };
+}
 
 function mapFile(row: FileRow): FileRecord {
   return {

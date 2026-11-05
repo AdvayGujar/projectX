@@ -2,14 +2,19 @@ import { describe, expect, it } from "vitest";
 
 import type { DbContext } from "../../db";
 import { createFileRepository, createSessionRepository } from "../../db";
+import type { FileStorageOptions } from "../../ports";
 import { createFileImporter } from "../index";
 import { withContext } from "../../db/__tests__/helpers";
 
 interface FakeStorage {
   readonly copies: Array<{ sourceUri: string; relativePath: string }>;
   readonly removed: string[];
-  copyFromUri(sourceUri: string, relativePath: string): Promise<{ size: number }>;
-  remove(relativePath: string): Promise<void>;
+  copyFromUri(
+    sourceUri: string,
+    relativePath: string,
+    options?: FileStorageOptions,
+  ): Promise<{ size: number | null }>;
+  remove(relativePath: string, options?: FileStorageOptions): Promise<void>;
 }
 
 function createFakeStorage(options: { failCopy?: boolean } = {}): FakeStorage {
@@ -18,14 +23,14 @@ function createFakeStorage(options: { failCopy?: boolean } = {}): FakeStorage {
   return {
     copies,
     removed,
-    async copyFromUri(sourceUri, relativePath) {
+    async copyFromUri(sourceUri, relativePath, _options) {
+      copies.push({ sourceUri, relativePath });
       if (options.failCopy) {
         throw new Error("copy failed");
       }
-      copies.push({ sourceUri, relativePath });
       return { size: 2048 };
     },
-    async remove(relativePath) {
+    async remove(relativePath, _options) {
       removed.push(relativePath);
     },
   };
@@ -36,11 +41,11 @@ function failingDocumentDb(ctx: DbContext): DbContext {
     ...ctx,
     db: {
       ...ctx.db,
-      async execute(sql, params) {
-        if (sql.includes("INSERT INTO documents")) {
+      async executeBatch(commands) {
+        if (commands.some(([sql]) => sql.includes("INSERT INTO documents"))) {
           throw new Error("document insert failed");
         }
-        return ctx.db.execute(sql, params);
+        return ctx.db.executeBatch(commands);
       },
     },
   };
@@ -79,9 +84,9 @@ describe("file importer", () => {
     const sessions = createSessionRepository(ctx);
     const session = await sessions.create({});
     const storage = createFakeStorage();
-    storage.copyFromUri = async (sourceUri, relativePath) => {
+    storage.copyFromUri = async (sourceUri, relativePath, _options) => {
       storage.copies.push({ sourceUri, relativePath });
-      return { size: 0 };
+      return { size: null };
     };
 
     const imported = await createFileImporter(ctx, storage).import({
@@ -95,6 +100,26 @@ describe("file importer", () => {
     expect(imported.file.size).toBe(321);
     expect(imported.file.kind).toBe("text");
     expect(imported.file.path).toMatch(/\.txt$/);
+  }));
+
+  it("keeps a genuine zero-byte copy at zero", () => withContext(async (ctx) => {
+    const sessions = createSessionRepository(ctx);
+    const session = await sessions.create({});
+    const storage = createFakeStorage();
+    storage.copyFromUri = async (sourceUri, relativePath, _options) => {
+      storage.copies.push({ sourceUri, relativePath });
+      return { size: 0 };
+    };
+
+    const imported = await createFileImporter(ctx, storage).import({
+      sessionId: session.id,
+      sourceUri: "file:///picker/empty.txt",
+      name: "empty.txt",
+      mime: "text/plain",
+      size: 321,
+    });
+
+    expect(imported.file.size).toBe(0);
   }));
 
   it("rejects a missing session before copying", () => withContext(async (ctx) => {
@@ -134,7 +159,7 @@ describe("file importer", () => {
     const session = await sessions.create({});
     const storage = createFakeStorage();
     const controller = new AbortController();
-    storage.copyFromUri = async (sourceUri, relativePath) => {
+    storage.copyFromUri = async (sourceUri, relativePath, _options) => {
       storage.copies.push({ sourceUri, relativePath });
       controller.abort();
       return { size: 12 };
@@ -152,7 +177,7 @@ describe("file importer", () => {
     expect(await createFileRepository(ctx).listBySession(session.id)).toEqual([]);
   }));
 
-  it("removes bytes when the copy fails", () => withContext(async (ctx) => {
+  it("removes a partial copy when the copy fails", () => withContext(async (ctx) => {
     const sessions = createSessionRepository(ctx);
     const session = await sessions.create({});
     const storage = createFakeStorage({ failCopy: true });
@@ -162,12 +187,16 @@ describe("file importer", () => {
       sourceUri: "file:///picker/report.pdf",
       name: "report.pdf",
       mime: "application/pdf",
-    })).rejects.toThrow("copy failed");
+    })).rejects.toMatchObject({
+      code: "unknown",
+      userMessage: "Could not import the file.",
+    });
 
+    expect(storage.removed).toEqual([storage.copies[0]?.relativePath]);
     expect(await createFileRepository(ctx).listBySession(session.id)).toEqual([]);
   }));
 
-  it("removes the file row and bytes when queuing extraction fails", () => withContext(async (ctx) => {
+  it("rolls back the file row when queuing extraction fails", () => withContext(async (ctx) => {
     const sessions = createSessionRepository(ctx);
     const session = await sessions.create({});
     const storage = createFakeStorage();
@@ -178,7 +207,10 @@ describe("file importer", () => {
       sourceUri: "file:///picker/report.pdf",
       name: "report.pdf",
       mime: "application/pdf",
-    })).rejects.toThrow("document insert failed");
+    })).rejects.toMatchObject({
+      code: "unknown",
+      userMessage: "Could not save the file.",
+    });
 
     expect(await createFileRepository(ctx).listBySession(session.id)).toEqual([]);
     expect(storage.removed).toHaveLength(1);

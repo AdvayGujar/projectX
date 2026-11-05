@@ -78,8 +78,9 @@ component and the screen that composes it.
    `FileStoragePort` and writes the `files` then `documents` rows.
 2. The app supplies the port with `createAppFileStorage()` from
    `apps/mobile/src/services/fileStorage.ts`.
-3. Picker URIs and file names never become paths. Only the validated relative path crosses
-   the port, so `..`, absolute paths, and symlink escapes are rejected in core.
+3. Picker URIs and file names never become paths. Core rejects `..`, absolute paths,
+   backslashes, and control characters; the adapter only joins validated relative paths
+   under `Paths.document`.
 
 ### Add a provider
 

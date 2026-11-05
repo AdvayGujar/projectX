@@ -80,6 +80,50 @@ describe("file repository", () => {
     });
   }));
 
+  it("rejects a path that escapes the sandbox", () => withContext(async (ctx) => {
+    const sessions = createSessionRepository(ctx);
+    const session = await sessions.create({});
+
+    await expect(addFile(ctx, session.id, { path: "../escape.pdf" })).rejects.toMatchObject({
+      code: "db_invalid",
+    });
+    await expect(addFile(ctx, session.id, { path: "/absolute.pdf" })).rejects.toMatchObject({
+      code: "db_invalid",
+    });
+  }));
+
+  it("writes the file and its pending document in one transaction", () => withContext(async (ctx) => {
+    const sessions = createSessionRepository(ctx);
+    const files = createFileRepository(ctx);
+    const documents = createDocumentRepository(ctx);
+    const session = await sessions.create({});
+    const id = ctx.ids();
+
+    const result = await files.addWithDocument({
+      id,
+      sessionId: session.id,
+      name: "report.pdf",
+      mime: "application/pdf",
+      size: 10,
+      path: `sessions/${session.id}/files/${id}.pdf`,
+      kind: "pdf",
+    });
+
+    expect(result.file.id).toBe(id);
+    expect(result.document).toMatchObject({ fileId: id, status: "pending" });
+    expect(await documents.getByFile(id)).toMatchObject({ id: result.document.id });
+  }));
+
+  it("removes a file row directly", () => withContext(async (ctx) => {
+    const sessions = createSessionRepository(ctx);
+    const files = createFileRepository(ctx);
+    const session = await sessions.create({});
+    const file = await addFile(ctx, session.id);
+
+    await files.remove(file.id);
+    expect(await files.get(file.id)).toBeNull();
+  }));
+
   it("cascades files, documents, and chunks when a session is removed", () => withContext(async (ctx) => {
     const sessions = createSessionRepository(ctx);
     const documents = createDocumentRepository(ctx);
@@ -100,6 +144,30 @@ describe("file repository", () => {
       document.id,
     ]);
     expect(chunks.rows).toHaveLength(0);
+  }));
+
+  it("keeps artifacts and their versions when a session is removed", () => withContext(async (ctx) => {
+    const sessions = createSessionRepository(ctx);
+    const session = await sessions.create({});
+
+    await ctx.db.execute(
+      `INSERT INTO artifacts (id, session_id, kind, title, current_version, created_at, updated_at)
+       VALUES ('artifact', ?, 'deck', 'Deck', 1, 1, 1)`,
+      [session.id],
+    );
+    await ctx.db.execute(
+      `INSERT INTO artifact_versions (artifact_id, version, spec_json, created_by, created_at)
+       VALUES ('artifact', 1, '{}', 'model', 1)`,
+    );
+
+    await sessions.remove(session.id);
+
+    const artifact = await ctx.db.execute("SELECT session_id FROM artifacts WHERE id = 'artifact'");
+    expect(artifact.rows[0]?.session_id).toBeNull();
+    const versions = await ctx.db.execute(
+      "SELECT version FROM artifact_versions WHERE artifact_id = 'artifact'",
+    );
+    expect(versions.rows).toHaveLength(1);
   }));
 });
 
@@ -131,6 +199,10 @@ describe("document repository", () => {
       error: "Encrypted",
     });
     expect(failed.error).toBe("Encrypted");
+
+    const recovered = await documents.update(document.id, { status: "ready", pageCount: 4 });
+    expect(recovered.error).toBeNull();
+    expect(recovered.pageCount).toBe(4);
   }));
 
   it("sets extractedAt when a document becomes ready", () => withContext(async (ctx) => {

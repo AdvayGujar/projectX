@@ -1,6 +1,5 @@
-import { AppError } from "../errors";
+import { assertSafeSegment } from "../paths";
 
-const SAFE_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const SAFE_EXTENSION = /^[a-z0-9]{1,10}$/;
 const MAX_NAME_LENGTH = 160;
 
@@ -46,35 +45,11 @@ export function fileRelativePath(
   return `${sessionFilesDirectory(sessionId)}/${fileId}${extension ? `.${extension}` : ""}`;
 }
 
-/** Validates a relative sandbox path before it is joined to a storage root. */
-export function assertSafeRelativePath(relativePath: string): void {
-  if (!relativePath || relativePath.startsWith("/") || relativePath.includes("\\")) {
-    throw unsafePath(relativePath);
-  }
-  if (relativePath.includes("\0")) {
-    throw unsafePath(relativePath);
-  }
-  const segments = relativePath.split("/");
-  if (segments.some((segment) => !segment || segment === "." || segment === "..")) {
-    throw unsafePath(relativePath);
-  }
-  for (const segment of segments) {
-    if (!SAFE_SEGMENT.test(segment)) {
-      throw unsafePath(relativePath);
-    }
-  }
-}
-
-/** Joins a root URI to a validated relative path, so nothing can escape the sandbox. */
-export function joinUnderRoot(rootUri: string, relativePath: string): string {
-  assertSafeRelativePath(relativePath);
-  const root = rootUri.endsWith("/") ? rootUri : `${rootUri}/`;
-  return `${root}${relativePath}`;
-}
-
 export function safeDisplayName(name: string): string {
-  const cleaned = name.replace(/[\u0000-\u001f\u007f]/g, "").trim();
-  return cleaned.slice(0, MAX_NAME_LENGTH) || "Untitled file";
+  const cleaned = name
+    .replace(/[\u0000-\u001f\u007f\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, "")
+    .trim();
+  return Array.from(cleaned).slice(0, MAX_NAME_LENGTH).join("") || "Untitled file";
 }
 
 export function extensionOf(name: string): string {
@@ -100,18 +75,4 @@ function extensionForFile(name: string, mime: string): string {
     return fromName || fromMime;
   }
   return fromMime || fromName;
-}
-
-function assertSafeSegment(value: string, label: string): void {
-  if (!SAFE_SEGMENT.test(value)) {
-    throw new AppError("db_invalid", `Unsafe ${label}: ${value}`, {
-      userMessage: "The file location is invalid.",
-    });
-  }
-}
-
-function unsafePath(path: string): AppError {
-  return new AppError("db_invalid", `Unsafe file path: ${path}`, {
-    userMessage: "The file location is invalid.",
-  });
 }

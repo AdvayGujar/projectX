@@ -1,7 +1,7 @@
 import { AppError } from "../errors";
-import { createDocumentRepository, createFileRepository, createSessionRepository } from "../db";
-import type { DbContext, DocumentRecord, FileRecord } from "../db";
-import type { FileStoragePort } from "../ports";
+import { createFileRepository, createSessionRepository } from "../db";
+import type { DbContext, DocumentRecord, FileRecord, Session } from "../db";
+import type { CopiedFile, FileStoragePort } from "../ports";
 import { detectFileKind } from "./kinds";
 import { fileRelativePath, safeDisplayName } from "./paths";
 
@@ -28,29 +28,17 @@ export interface FileImporter {
 }
 
 /**
- * Copies a picked file into the session's sandbox folder, then records it. The file row is
- * only written after the copy succeeds, and both row and bytes are discarded if recording
- * the document fails.
+ * Copies a picked file into the session's sandbox folder, then records the file and its
+ * pending extraction row in one transaction. Bytes are removed on every failure path.
  */
 export function createFileImporter(ctx: DbContext, storage: FileStoragePort): FileImporter {
   const files = createFileRepository(ctx);
-  const documents = createDocumentRepository(ctx);
   const sessions = createSessionRepository(ctx);
 
   return {
     async import(input: ImportFileInput): Promise<ImportedFile> {
       throwIfAborted(input.signal);
-      const session = await sessions.get(input.sessionId);
-      if (!session) {
-        throw new AppError("db_not_found", `Session ${input.sessionId} not found`, {
-          userMessage: "That chat no longer exists.",
-        });
-      }
-      if (!input.sourceUri.trim()) {
-        throw new AppError("db_invalid", "Source URI is required", {
-          userMessage: "The file could not be read.",
-        });
-      }
+      const session = await requireSession(sessions, input.sessionId);
       throwIfAborted(input.signal);
 
       const id = ctx.ids();
@@ -59,21 +47,19 @@ export function createFileImporter(ctx: DbContext, storage: FileStoragePort): Fi
       const kind = detectFileKind(name, mime);
       const relativePath = fileRelativePath(session.id, id, name, mime);
 
-      const copied = await storage.copyFromUri(input.sourceUri, relativePath);
+      const copied = await copyIntoSession(storage, input.sourceUri, relativePath, input.signal);
       if (input.signal?.aborted) {
-        await discard(storage, relativePath);
+        await discard(storage, relativePath, cancelled());
         throw cancelled();
       }
 
-      const size = copied.size > 0 ? copied.size : fallbackSize(input.size);
-      let file: FileRecord;
       try {
-        file = await files.add({
+        return await files.addWithDocument({
           id,
           sessionId: session.id,
           name,
           mime,
-          size,
+          size: copied.size ?? fallbackSize(input.size),
           path: relativePath,
           kind,
         });
@@ -81,45 +67,65 @@ export function createFileImporter(ctx: DbContext, storage: FileStoragePort): Fi
         await discard(storage, relativePath, error);
         throw error;
       }
-
-      try {
-        throwIfAborted(input.signal);
-        const document = await documents.create({ fileId: file.id });
-        return { file, document };
-      } catch (error) {
-        await discard(storage, relativePath, error, file.id, files.remove);
-        throw error;
-      }
     },
   };
+}
+
+async function requireSession(
+  sessions: ReturnType<typeof createSessionRepository>,
+  sessionId: string,
+): Promise<Session> {
+  const session = await sessions.get(sessionId);
+  if (!session) {
+    throw new AppError("db_not_found", `Session ${sessionId} not found`, {
+      userMessage: "That chat no longer exists.",
+    });
+  }
+  return session;
+}
+
+async function copyIntoSession(
+  storage: FileStoragePort,
+  sourceUri: string,
+  relativePath: string,
+  signal: AbortSignal | undefined,
+): Promise<CopiedFile> {
+  if (!sourceUri.trim()) {
+    throw new AppError("db_invalid", "Source URI is required", {
+      userMessage: "The file could not be read.",
+    });
+  }
+  try {
+    return await storage.copyFromUri(sourceUri, relativePath, { signal });
+  } catch (error) {
+    await discard(storage, relativePath, error);
+    throw toImportError(error);
+  }
 }
 
 async function discard(
   storage: FileStoragePort,
   relativePath: string,
-  primary?: unknown,
-  fileId?: string,
-  removeRow?: (id: string) => Promise<void>,
+  primary: unknown,
 ): Promise<void> {
-  const failures: unknown[] = [];
-  if (fileId && removeRow) {
-    try {
-      await removeRow(fileId);
-    } catch (error) {
-      failures.push(error);
-    }
-  }
   try {
     await storage.remove(relativePath);
   } catch (error) {
-    failures.push(error);
-  }
-  if (failures.length > 0) {
     throw new AppError("unknown", "Import cleanup failed", {
-      cause: { primary, failures },
+      cause: { primary, cleanup: error },
       userMessage: "Could not import the file.",
     });
   }
+}
+
+function toImportError(error: unknown): AppError {
+  if (error instanceof AppError) {
+    return error;
+  }
+  return new AppError("unknown", "Could not copy the file into the app", {
+    cause: error,
+    userMessage: "Could not import the file.",
+  });
 }
 
 function throwIfAborted(signal: AbortSignal | undefined): void {

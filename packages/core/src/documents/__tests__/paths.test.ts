@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
 
+import { assertSafeRelativePath, joinUnderRoot } from "../../index";
 import {
-  assertSafeRelativePath,
   extensionForMime,
   extensionOf,
   fileRelativePath,
-  joinUnderRoot,
   safeDisplayName,
   sessionFilesDirectory,
 } from "../index";
@@ -44,9 +43,17 @@ describe("document paths", () => {
       "sessions\\files\\file.pdf",
       "sessions/s/files/../file.pdf",
       "sessions/s/files/.hidden",
+      "sessions/s/files/file\u0000.pdf",
     ]) {
       expect(() => assertSafeRelativePath(path)).toThrow();
     }
+  });
+
+  it("rejects unsafe session and file ids", () => {
+    expect(() => sessionFilesDirectory("a/b")).toThrow();
+    expect(() => sessionFilesDirectory("..")).toThrow();
+    expect(() => fileRelativePath("../session", "file", "a.pdf", "application/pdf")).toThrow();
+    expect(() => fileRelativePath("session", "../../file", "a.pdf", "application/pdf")).toThrow();
   });
 
   it("joins under a root without doubling the separator", () => {
@@ -61,7 +68,9 @@ describe("document paths", () => {
   it("normalises display names and extensions", () => {
     expect(safeDisplayName("  report.pdf  ")).toBe("report.pdf");
     expect(safeDisplayName("bad\u0000name")).toBe("badname");
+    expect(safeDisplayName("bad\u202Ename")).toBe("badname");
     expect(safeDisplayName("   ")).toBe("Untitled file");
+    expect(Array.from(safeDisplayName("a".repeat(200)))).toHaveLength(160);
     expect(extensionOf("report.PDF")).toBe("pdf");
     expect(extensionOf("archive.tar.gz")).toBe("gz");
     expect(extensionOf(".hidden")).toBe("");
