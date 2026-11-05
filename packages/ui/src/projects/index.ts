@@ -14,6 +14,9 @@ export type { ProjectListItem, ProjectListProps } from "./ProjectList";
 export { ProjectMenu } from "./ProjectMenu";
 export type { ProjectMenuProps } from "./ProjectMenu";
 
+export { ProjectPickerSheet } from "./ProjectPickerSheet";
+export type { ProjectPickerSheetProps } from "./ProjectPickerSheet";
+
 export { ProjectSessionList } from "./ProjectSessionList";
 export type { ProjectSessionListProps, ProjectSessionSummary } from "./ProjectSessionList";
 

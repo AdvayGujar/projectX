@@ -20,6 +20,14 @@ describe("session store", () => {
     ]);
   });
 
+  it("updates the title without touching the transcript", () => {
+    store().addTurn({ id: "a", role: "user", text: "hello" });
+    store().setTitle("Renamed");
+
+    expect(store().title).toBe("Renamed");
+    expect(store().turns).toHaveLength(1);
+  });
+
   it("marks streaming turns as done on settle", () => {
     store().addTurn({ id: "a", role: "assistant", text: "", status: "streaming" });
     store().settleStreaming();

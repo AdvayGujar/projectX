@@ -9,6 +9,7 @@ export interface SessionMenuProps {
   readonly visible: boolean;
   readonly title: string;
   readonly muted: boolean;
+  readonly pinned: boolean;
   readonly onClose: () => void;
   readonly onToggleMute: () => void;
   readonly onRename: () => void;
@@ -22,6 +23,7 @@ export function SessionMenu({
   visible,
   title,
   muted,
+  pinned,
   onClose,
   onToggleMute,
   onRename,
@@ -41,7 +43,7 @@ export function SessionMenu({
 
           <MenuItem icon="mute" label="Mute" onPress={onToggleMute} trailing={<MuteSwitch on={muted} />} />
           <MenuItem icon="pencil" label="Rename" onPress={onRename} />
-          <MenuItem icon="pin" label="Pin" onPress={onPin} />
+          <MenuItem icon="pin" label={pinned ? "Unpin" : "Pin"} onPress={onPin} />
           <MenuItem icon="folder" label="Add to project" onPress={onAddToProject} />
           <MenuItem icon="trash" label="Delete" onPress={onDelete} destructive />
         </View>

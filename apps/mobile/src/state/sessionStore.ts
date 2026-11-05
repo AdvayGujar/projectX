@@ -29,6 +29,7 @@ interface SessionState {
     usage?: SessionUsage,
   ) => void;
   readonly resetSession: (sessionId: string) => void;
+  readonly setTitle: (title: string) => void;
   readonly addTurn: (turn: ViewTurn) => void;
   readonly addUsage: (input: {
     readonly inputTokens?: number;
@@ -67,6 +68,8 @@ export const useSessionStore = create<SessionState>((set) => ({
       error: null,
       usage: EMPTY_USAGE,
     }),
+
+  setTitle: (title) => set({ title }),
 
   addTurn: (turn) => set((state) => ({ turns: [...state.turns, turn] })),
 

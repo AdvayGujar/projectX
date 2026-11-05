@@ -21,6 +21,9 @@ export type { AddProviderSheetProps, ProviderPresetSummary } from "./settings/Ad
 export { ConfirmDialog } from "./primitives/ConfirmDialog";
 export type { ConfirmDialogProps } from "./primitives/ConfirmDialog";
 
+export { TextPromptDialog } from "./primitives/TextPromptDialog";
+export type { TextPromptDialogProps } from "./primitives/TextPromptDialog";
+
 export { ProviderMenu } from "./settings/ProviderMenu";
 export type { ProviderMenuProps } from "./settings/ProviderMenu";
 
@@ -32,6 +35,7 @@ export {
   ProjectHeader,
   ProjectList,
   ProjectMenu,
+  ProjectPickerSheet,
   ProjectSessionList,
   ProjectTabs,
   projectIconName,
@@ -44,6 +48,7 @@ export type {
   ProjectListItem,
   ProjectListProps,
   ProjectMenuProps,
+  ProjectPickerSheetProps,
   ProjectSessionListProps,
   ProjectSessionSummary,
   ProjectTabsProps,

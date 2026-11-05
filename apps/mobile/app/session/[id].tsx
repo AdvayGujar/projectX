@@ -3,7 +3,6 @@ import {
   AttachmentViewer,
   ComposerNotice,
   ModelPickerSheet,
-  SessionMenu,
   SourcesSheet,
   colors,
 } from "@projectx/ui";
@@ -16,6 +15,7 @@ import { useEffect, useMemo, useState } from "react";
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from "react-native";
 
 import { useOpenDrawer } from "../../src/navigation/useOpenDrawer";
+import { SessionActions } from "../../src/screens/session/SessionActions";
 import { SessionBody } from "../../src/screens/session/SessionBody";
 import { attachmentProblem, readImageAttachments } from "../../src/services/attachments";
 import { SessionComposerSection } from "../../src/screens/session/SessionComposerSection";
@@ -48,12 +48,15 @@ export default function SessionScreen(): ReactElement {
   const usage = useSessionStore((state) => state.usage);
   const activeSessionId = useSessionStore((state) => state.activeSessionId);
   const beginSession = useSessionStore((state) => state.beginSession);
+  const setTitle = useSessionStore((state) => state.setTitle);
   const setError = useSessionStore((state) => state.setError);
 
   const [text, setText] = useState("");
   const [think, setThink] = useState(true);
   const [search, setSearch] = useState(false);
   const [muted, setMuted] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const [projectId, setProjectId] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -66,12 +69,16 @@ export default function SessionScreen(): ReactElement {
       return;
     }
     let active = true;
+    setPinned(false);
+    setProjectId(null);
     void loadSession(sessionId)
       .then((loaded) => {
         if (!active) {
           return;
         }
         if (loaded) {
+          setPinned(loaded.pinned);
+          setProjectId(loaded.projectId);
           beginSession(sessionId, loaded.title, loaded.turns, loaded.totals);
         } else {
           setError("Chat not found.");
@@ -287,16 +294,19 @@ export default function SessionScreen(): ReactElement {
         onRecord={() => undefined}
       />
 
-      <SessionMenu
-        visible={menuOpen}
-        title={title || "Untitled"}
+      <SessionActions
+        sessionId={sessionId}
+        title={title}
         muted={muted}
-        onClose={() => setMenuOpen(false)}
+        pinned={pinned}
+        projectId={projectId}
+        menuOpen={menuOpen}
+        onCloseMenu={() => setMenuOpen(false)}
         onToggleMute={toggleMute}
-        onRename={() => setMenuOpen(false)}
-        onPin={() => setMenuOpen(false)}
-        onAddToProject={() => setMenuOpen(false)}
-        onDelete={() => setMenuOpen(false)}
+        onTitleChange={setTitle}
+        onPinnedChange={setPinned}
+        onProjectChange={setProjectId}
+        onNotice={(message) => setNotice({ message, icon: "pencil" })}
       />
 
       <SourcesSheet visible={sourcesOpen} sources={sources} onClose={() => setSourcesOpen(false)} />

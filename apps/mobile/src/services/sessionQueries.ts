@@ -9,6 +9,7 @@ import type { MessageWithParts, Part } from "@projectx/core";
 import type { TurnAttachment, TurnCost, ViewTurn } from "@projectx/ui";
 
 import { getDbContext } from "../db/client";
+import { createAppFileStorage } from "./fileStorage";
 
 export interface SessionSummary {
   readonly id: string;
@@ -24,6 +25,8 @@ export interface SessionTotals {
 
 export interface LoadedSession {
   readonly title: string;
+  readonly pinned: boolean;
+  readonly projectId: string | null;
   readonly turns: readonly ViewTurn[];
   readonly totals: SessionTotals;
 }
@@ -43,14 +46,49 @@ export async function createSession(input: {
   title: string;
   providerId: string;
   modelId: string;
+  projectId?: string | null;
 }): Promise<string> {
   const context = await getDbContext();
   const session = await createSessionRepository(context).create({
     title: input.title,
     providerId: input.providerId,
     modelId: input.modelId,
+    projectId: input.projectId ?? null,
   });
   return session.id;
+}
+
+export async function renameSession(id: string, title: string): Promise<void> {
+  const context = await getDbContext();
+  await createSessionRepository(context).update(id, { title });
+}
+
+export async function setSessionPinned(id: string, pinned: boolean): Promise<void> {
+  const context = await getDbContext();
+  await createSessionRepository(context).update(id, { pinned });
+}
+
+export async function setSessionProject(id: string, projectId: string | null): Promise<void> {
+  const context = await getDbContext();
+  await createSessionRepository(context).update(id, { projectId });
+}
+
+/**
+ * Removes the chat and its session-owned files. Project-owned library files are kept: they
+ * belong to the project, not to this chat. A cleanup failure is reported, not thrown, so the
+ * chat row is never restored just because the sandbox is dirty.
+ */
+export async function deleteSession(id: string): Promise<{ cleanupWarning: string | null }> {
+  const context = await getDbContext();
+  await createSessionRepository(context).remove(id);
+  try {
+    await createAppFileStorage().removeDirectory(`sessions/${id}`);
+    return { cleanupWarning: null };
+  } catch {
+    return {
+      cleanupWarning: "The chat was deleted, but its session files could not be removed.",
+    };
+  }
 }
 
 /** Prepares the latest reply for regeneration and supersedes it in the session. */
@@ -110,6 +148,8 @@ export async function loadSession(sessionId: string): Promise<LoadedSession | nu
   const prices = await loadPrices();
   return {
     title: session.title,
+    pinned: session.pinned,
+    projectId: session.projectId,
     turns: messages.map((message) => toTurn(message, prices)).filter(isTurn),
     totals: totalsOf(messages, prices),
   };
