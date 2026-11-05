@@ -27,6 +27,29 @@ export type { ProviderMenuProps } from "./settings/ProviderMenu";
 export { ProviderList } from "./settings/ProviderList";
 export type { ProviderListProps, ProviderSummary } from "./settings/ProviderList";
 
+export {
+  ProjectEditorSheet,
+  ProjectHeader,
+  ProjectList,
+  ProjectMenu,
+  ProjectSessionList,
+  ProjectTabs,
+  projectIconName,
+} from "./projects";
+export type {
+  ProjectEditorInitial,
+  ProjectEditorSheetProps,
+  ProjectEditorValues,
+  ProjectHeaderProps,
+  ProjectListItem,
+  ProjectListProps,
+  ProjectMenuProps,
+  ProjectSessionListProps,
+  ProjectSessionSummary,
+  ProjectTabsProps,
+  ProjectTabKey,
+} from "./projects";
+
 export { ModelPickerSheet } from "./session/ModelPickerSheet";
 export type { ModelPickerSheetProps } from "./session/ModelPickerSheet";
 

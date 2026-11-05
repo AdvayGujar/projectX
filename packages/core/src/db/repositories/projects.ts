@@ -11,6 +11,14 @@ interface ProjectRow {
   updated_at: number;
 }
 
+interface ProjectCountRow extends ProjectRow {
+  session_count: number;
+}
+
+export interface ProjectWithCount extends Project {
+  sessionCount: number;
+}
+
 export interface CreateProjectInput {
   name: string;
   icon?: string | null;
@@ -47,6 +55,17 @@ export function createProjectRepository({ db, ids, now }: DbContext) {
     async list(): Promise<Project[]> {
       const result = await db.execute("SELECT * FROM projects ORDER BY updated_at DESC");
       return result.rows.map((row) => mapProject(row as unknown as ProjectRow));
+    },
+
+    async listWithCounts(): Promise<ProjectWithCount[]> {
+      const result = await db.execute(
+        `SELECT p.*, COUNT(CASE WHEN s.archived = 0 THEN 1 END) AS session_count
+         FROM projects p
+         LEFT JOIN sessions s ON s.project_id = p.id
+         GROUP BY p.id
+         ORDER BY p.updated_at DESC`,
+      );
+      return result.rows.map((row) => mapProjectWithCount(row as unknown as ProjectCountRow));
     },
 
     async update(id: string, patch: UpdateProjectInput): Promise<Project> {
@@ -116,6 +135,10 @@ function mapProject(row: ProjectRow): Project {
     createdAt: Number(row.created_at),
     updatedAt: Number(row.updated_at),
   };
+}
+
+function mapProjectWithCount(row: ProjectCountRow): ProjectWithCount {
+  return { ...mapProject(row), sessionCount: Number(row.session_count) };
 }
 
 function normalizeName(name: string): string {

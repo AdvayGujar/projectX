@@ -37,6 +37,28 @@ describe("project repository", () => {
       code: "db_not_found",
     });
   }));
+
+  it("counts project sessions and ignores standalone chats", () => withContext(async (ctx) => {
+    const projects = createProjectRepository(ctx);
+    const sessions = createSessionRepository(ctx);
+    const novel = await projects.create({ name: "Novel" });
+    const empty = await projects.create({ name: "Empty" });
+
+    await sessions.create({ projectId: novel.id, title: "Chapter one" });
+    await sessions.create({ projectId: novel.id, title: "Chapter two" });
+    const archived = await sessions.create({ projectId: novel.id, title: "Archived" });
+    await sessions.create({ title: "Loose thought" });
+    await sessions.update(archived.id, { archived: true });
+
+    const listed = await projects.listWithCounts();
+
+    expect(listed.map((project) => [project.name, project.sessionCount])).toEqual([
+      ["Empty", 0],
+      ["Novel", 2],
+    ]);
+    expect(listed.find((project) => project.id === empty.id)?.sessionCount).toBe(0);
+    expect(listed.find((project) => project.id === novel.id)?.icon).toBeNull();
+  }));
 });
 
 describe("session repository", () => {
