@@ -1,6 +1,6 @@
 import type { FileStorageOptions, FileStoragePort } from "@projectx/core";
 import { AppError, joinUnderRoot } from "@projectx/core";
-import { File, Paths } from "expo-file-system";
+import { Directory, File, Paths } from "expo-file-system";
 
 const DOCUMENTS_ROOT = Paths.document.uri;
 
@@ -24,6 +24,13 @@ export function createAppFileStorage(): FileStoragePort {
       const file = new File(joinUnderRoot(DOCUMENTS_ROOT, relativePath));
       if (file.exists) {
         file.delete();
+      }
+    },
+
+    async removeDirectory(relativePath) {
+      const directory = new Directory(joinUnderRoot(DOCUMENTS_ROOT, relativePath));
+      if (directory.exists) {
+        directory.delete();
       }
     },
   };

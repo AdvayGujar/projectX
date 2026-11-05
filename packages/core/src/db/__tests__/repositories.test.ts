@@ -37,6 +37,28 @@ describe("project repository", () => {
       code: "db_not_found",
     });
   }));
+
+  it("counts project sessions and ignores standalone chats", () => withContext(async (ctx) => {
+    const projects = createProjectRepository(ctx);
+    const sessions = createSessionRepository(ctx);
+    const novel = await projects.create({ name: "Novel" });
+    const empty = await projects.create({ name: "Empty" });
+
+    await sessions.create({ projectId: novel.id, title: "Chapter one" });
+    await sessions.create({ projectId: novel.id, title: "Chapter two" });
+    const archived = await sessions.create({ projectId: novel.id, title: "Archived" });
+    await sessions.create({ title: "Loose thought" });
+    await sessions.update(archived.id, { archived: true });
+
+    const listed = await projects.listWithCounts();
+
+    expect(listed.map((project) => [project.name, project.sessionCount])).toEqual([
+      ["Empty", 0],
+      ["Novel", 2],
+    ]);
+    expect(listed.find((project) => project.id === empty.id)?.sessionCount).toBe(0);
+    expect(listed.find((project) => project.id === novel.id)?.icon).toBeNull();
+  }));
 });
 
 describe("session repository", () => {
@@ -62,6 +84,47 @@ describe("session repository", () => {
 
     expect(updated.title).toBe("New");
     expect(updated.pinned).toBe(true);
+  }));
+
+  it("moves a session into a project", () => withContext(async (ctx) => {
+    const projects = createProjectRepository(ctx);
+    const sessions = createSessionRepository(ctx);
+    const project = await projects.create({ name: "Novel" });
+    const session = await sessions.create({});
+
+    const moved = await sessions.update(session.id, { projectId: project.id });
+    expect(moved.projectId).toBe(project.id);
+    expect((await sessions.listByProject(project.id)).map((item) => item.id)).toEqual([session.id]);
+  }));
+
+  it("moves a session back out of a project", () => withContext(async (ctx) => {
+    const projects = createProjectRepository(ctx);
+    const sessions = createSessionRepository(ctx);
+    const project = await projects.create({ name: "Novel" });
+    const session = await sessions.create({ projectId: project.id });
+
+    const moved = await sessions.update(session.id, { projectId: null });
+    expect(moved.projectId).toBeNull();
+    expect(await sessions.listByProject(project.id)).toHaveLength(0);
+    expect((await sessions.listByProject(null)).map((item) => item.id)).toEqual([session.id]);
+  }));
+
+  it("lists pinned sessions first in recent and project lists", () => withContext(async (ctx) => {
+    const projects = createProjectRepository(ctx);
+    const sessions = createSessionRepository(ctx);
+    const project = await projects.create({ name: "Novel" });
+    const pinned = await sessions.create({ projectId: project.id, title: "Pinned" });
+    const newest = await sessions.create({ projectId: project.id, title: "Newest" });
+    const archived = await sessions.create({ projectId: project.id, title: "Archived" });
+
+    await sessions.update(pinned.id, { pinned: true });
+    await sessions.update(archived.id, { archived: true });
+
+    expect((await sessions.listByProject(project.id)).map((item) => item.id)).toEqual([
+      pinned.id,
+      newest.id,
+    ]);
+    expect((await sessions.listRecent()).map((item) => item.id)).toEqual([pinned.id, newest.id]);
   }));
 
   it("cascades messages when a session is removed", () => withContext(async (ctx) => {

@@ -16,6 +16,12 @@ export function parseSelectionId(id: string): SelectionRef | null {
   return { providerId: id.slice(0, separator), modelId: id.slice(separator + 1) };
 }
 
+/** Project guidance is the only system text a turn carries until memory lands (M2.3c). */
+export function composeSystemPrompt(instructions: string | null | undefined): string {
+  const trimmed = instructions?.trim() ?? "";
+  return trimmed.length === 0 ? "" : `Project instructions:\n${trimmed}`;
+}
+
 export interface PricedTurn {
   readonly model: string;
   readonly effort: string;

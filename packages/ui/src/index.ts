@@ -21,11 +21,39 @@ export type { AddProviderSheetProps, ProviderPresetSummary } from "./settings/Ad
 export { ConfirmDialog } from "./primitives/ConfirmDialog";
 export type { ConfirmDialogProps } from "./primitives/ConfirmDialog";
 
+export { TextPromptDialog } from "./primitives/TextPromptDialog";
+export type { TextPromptDialogProps } from "./primitives/TextPromptDialog";
+
 export { ProviderMenu } from "./settings/ProviderMenu";
 export type { ProviderMenuProps } from "./settings/ProviderMenu";
 
 export { ProviderList } from "./settings/ProviderList";
 export type { ProviderListProps, ProviderSummary } from "./settings/ProviderList";
+
+export {
+  ProjectEditorSheet,
+  ProjectHeader,
+  ProjectList,
+  ProjectMenu,
+  ProjectPickerSheet,
+  ProjectSessionList,
+  ProjectTabs,
+  projectIconName,
+} from "./projects";
+export type {
+  ProjectEditorInitial,
+  ProjectEditorSheetProps,
+  ProjectEditorValues,
+  ProjectHeaderProps,
+  ProjectListItem,
+  ProjectListProps,
+  ProjectMenuProps,
+  ProjectPickerSheetProps,
+  ProjectSessionListProps,
+  ProjectSessionSummary,
+  ProjectTabsProps,
+  ProjectTabKey,
+} from "./projects";
 
 export { ModelPickerSheet } from "./session/ModelPickerSheet";
 export type { ModelPickerSheetProps } from "./session/ModelPickerSheet";

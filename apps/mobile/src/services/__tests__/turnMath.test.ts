@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 
-import { parseSelectionId, priceTurn } from "../turnMath";
+import { composeSystemPrompt, parseSelectionId, priceTurn } from "../turnMath";
 
 describe("parseSelectionId", () => {
   it("splits on the first colon", () => {
@@ -18,6 +18,20 @@ describe("parseSelectionId", () => {
     expect(parseSelectionId("nocolon")).toBeNull();
     expect(parseSelectionId(":model")).toBeNull();
     expect(parseSelectionId("provider:")).toBeNull();
+  });
+});
+
+describe("composeSystemPrompt", () => {
+  it("wraps trimmed project instructions", () => {
+    expect(composeSystemPrompt("  Keep answers short.  ")).toBe(
+      "Project instructions:\nKeep answers short.",
+    );
+  });
+
+  it("returns nothing for blank or missing guidance", () => {
+    expect(composeSystemPrompt("   ")).toBe("");
+    expect(composeSystemPrompt(null)).toBe("");
+    expect(composeSystemPrompt(undefined)).toBe("");
   });
 });
 

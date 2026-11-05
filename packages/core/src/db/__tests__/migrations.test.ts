@@ -1,14 +1,19 @@
 import { describe, expect, it } from "vitest";
 
 import type { SqlDatabase } from "../types";
-import { migrate, migrations } from "../migrations";
+import {
+  createProjectRepository,
+  createSessionRepository,
+  migrate,
+  migrations,
+} from "../index";
 import { createNodeDatabase, withContext } from "./helpers";
 
 describe("migrations", () => {
   it("applies once and is idempotent", async () => {
     const db = createNodeDatabase();
     try {
-      expect(await migrate(db)).toBe(4);
+      expect(await migrate(db)).toBe(5);
       expect(await migrate(db)).toBe(0);
     } finally {
       await db.close();
@@ -45,7 +50,7 @@ describe("migrations", () => {
     });
   });
 
-  it("owns files and artifacts by session, not project", async () => {
+  it("keeps files session-owned and gives artifacts a project home", async () => {
     await withContext(async ({ db }) => {
       const files = await db.execute("PRAGMA table_info(files)");
       const fileColumns = files.rows.map((row) => String(row.name));
@@ -56,7 +61,7 @@ describe("migrations", () => {
       const artifacts = await db.execute("PRAGMA table_info(artifacts)");
       const artifactColumns = artifacts.rows.map((row) => String(row.name));
       expect(artifactColumns).toContain("session_id");
-      expect(artifactColumns).not.toContain("project_id");
+      expect(artifactColumns).toContain("project_id");
 
       const indexes = await db.execute(
         "SELECT name FROM sqlite_master WHERE type = 'index' ORDER BY name",
@@ -66,7 +71,7 @@ describe("migrations", () => {
       expect(names).toContain("idx_artifacts_session");
       expect(names).toContain("idx_documents_file");
       expect(names).not.toContain("idx_files_project");
-      expect(names).not.toContain("idx_artifacts_project");
+      expect(names).toContain("idx_artifacts_project");
     });
   });
 
@@ -124,7 +129,7 @@ describe("migrations", () => {
          VALUES ('a', 1, '{}', 'model', 1)`,
       );
 
-      expect(await migrate(db)).toBe(1);
+      expect(await migrate(db)).toBe(2);
 
       // 004 rebuilds these pre-release tables; no shipped code has ever written them.
       for (const table of ["files", "documents", "doc_chunks", "artifacts", "artifact_versions"]) {
@@ -137,6 +142,35 @@ describe("migrations", () => {
       await db.close();
     }
   });
+
+  it("keeps an artifact when its session and project are both removed", () => withContext(async (ctx) => {
+    const projects = createProjectRepository(ctx);
+    const sessions = createSessionRepository(ctx);
+    const project = await projects.create({ name: "Novel" });
+    const session = await sessions.create({ projectId: project.id });
+
+    await ctx.db.execute(
+      `INSERT INTO artifacts (id, project_id, session_id, kind, title, current_version, created_at, updated_at)
+       VALUES ('artifact', ?, ?, 'deck', 'Deck', 1, 1, 1)`,
+      [project.id, session.id],
+    );
+
+    await sessions.remove(session.id);
+
+    const afterSession = await ctx.db.execute(
+      "SELECT session_id, project_id FROM artifacts WHERE id = 'artifact'",
+    );
+    expect(afterSession.rows[0]?.session_id).toBeNull();
+    expect(afterSession.rows[0]?.project_id).toBe(project.id);
+
+    await projects.remove(project.id);
+
+    const afterProject = await ctx.db.execute(
+      "SELECT session_id, project_id FROM artifacts WHERE id = 'artifact'",
+    );
+    expect(afterProject.rows).toHaveLength(1);
+    expect(afterProject.rows[0]?.project_id).toBeNull();
+  }));
 });
 
 async function applyThrough(db: SqlDatabase, version: number): Promise<void> {

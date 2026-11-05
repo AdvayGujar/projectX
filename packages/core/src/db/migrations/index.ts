@@ -3,12 +3,14 @@ import { initialMigration } from "./001-initial";
 import { messageEffortMigration } from "./002-message-effort";
 import { messageSupersededMigration } from "./003-message-superseded";
 import { sessionScopedFilesMigration } from "./004-session-scoped-files";
+import { artifactProjectHomeMigration } from "./005-artifact-project-home";
 
 const migrations: Migration[] = [
   initialMigration,
   messageEffortMigration,
   messageSupersededMigration,
   sessionScopedFilesMigration,
+  artifactProjectHomeMigration,
 ];
 
 export async function migrate(db: SqlDatabase): Promise<number> {

@@ -83,7 +83,7 @@ export function DrawerShell(props: DrawerShellProps): ReactElement {
 }
 
 function activeKeyForRoute(routeName: string): string {
-  if (routeName === "projects") {
+  if (routeName === "projects" || routeName === "project/[id]") {
     return "projects";
   }
   if (routeName === "artifacts") {

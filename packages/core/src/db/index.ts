@@ -25,6 +25,7 @@ export type { AddProviderInput, ProviderRecord, ProviderRepository } from "./rep
 export type {
   CreateProjectInput,
   ProjectRepository,
+  ProjectWithCount,
   UpdateProjectInput,
 } from "./repositories/projects";
 export { createSearchRepository, toFtsQuery } from "./repositories/search";

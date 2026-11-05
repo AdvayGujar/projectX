@@ -24,6 +24,7 @@ export default function RootLayout(): ReactElement {
         >
           <Drawer.Screen name="index" />
           <Drawer.Screen name="projects" />
+          <Drawer.Screen name="project/[id]" />
           <Drawer.Screen name="artifacts" />
           <Drawer.Screen name="settings" />
           <Drawer.Screen name="session/[id]" />
