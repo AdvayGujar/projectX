@@ -1,12 +1,15 @@
 import {
   AppError,
   createAdapter,
+  createProjectRepository,
   createProviderConfig,
   createProviderRepository,
   createRetryingFetch,
+  createSessionRepository,
   createTurnEngine,
 } from "@projectx/core";
 import type {
+  DbContext,
   FetchLike,
   ModelInfo,
   PartInput,
@@ -20,7 +23,7 @@ import type { ImageAttachment } from "./attachments";
 
 import { getDbContext } from "../db/client";
 import { readProviderKey } from "./keyStore";
-import { parseSelectionId, priceTurn } from "./turnMath";
+import { composeSystemPrompt, parseSelectionId, priceTurn } from "./turnMath";
 
 const MAX_OUTPUT_TOKENS = 4_096;
 
@@ -93,6 +96,7 @@ export function createTurnPort(sink: TurnSink): TurnPort {
 
     try {
       const context = await getDbContext();
+      const system = await systemPromptFor(context, input.sessionId);
       const providers = createProviderRepository(context);
       const provider = await providers.get(parsed.providerId);
       if (!provider) {
@@ -128,7 +132,7 @@ export function createTurnPort(sink: TurnSink): TurnPort {
         sessionId: input.sessionId,
         model,
         provider: runtime,
-        system: "",
+        system,
         effort: input.effort,
         userParts: input.regenerate ? [] : userParts(input),
         maxOutputTokens: Math.min(model.maxOutput, MAX_OUTPUT_TOKENS),
@@ -192,6 +196,16 @@ export function createTurnPort(sink: TurnSink): TurnPort {
     stop: () => controller?.abort(),
     isRunning: () => controller !== null,
   };
+}
+
+/** A standalone chat has no project, and a project without guidance adds nothing. */
+async function systemPromptFor(context: DbContext, sessionId: string): Promise<string> {
+  const session = await createSessionRepository(context).get(sessionId);
+  if (!session?.projectId) {
+    return "";
+  }
+  const project = await createProjectRepository(context).get(session.projectId);
+  return composeSystemPrompt(project?.instructions);
 }
 
 function attachmentsOf(input: TurnInput): TurnAttachment[] {

@@ -73,7 +73,7 @@ export function ProjectFields({
         textAlignVertical="top"
       />
       <Text style={styles.hint}>
-        Stored with the project. Chats in this project read it in a later milestone.
+        Chats in this project receive this guidance on every turn.
       </Text>
     </>
   );
