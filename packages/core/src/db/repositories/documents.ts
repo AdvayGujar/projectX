@@ -1,5 +1,6 @@
 import { AppError } from "../../errors";
 import type { DbContext, DocumentRecord, DocumentStatus, SqlValue } from "../types";
+import { insertPendingDocumentCommand } from "./commands";
 import { toDbError } from "./errors";
 
 interface DocumentRow {
@@ -30,12 +31,9 @@ export function createDocumentRepository({ db, ids, now }: DbContext) {
   return {
     async create(input: CreateDocumentInput): Promise<DocumentRecord> {
       const id = ids();
+      const command = insertPendingDocumentCommand(id, input.fileId);
       try {
-        await db.execute(
-          `INSERT INTO documents (id, file_id, status)
-           VALUES (?, ?, 'pending')`,
-          [id, input.fileId],
-        );
+        await db.execute(command[0], command[1]);
       } catch (error) {
         throw toDbError(error, "Could not queue the document.");
       }

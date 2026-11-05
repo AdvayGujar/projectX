@@ -1,6 +1,7 @@
 import { AppError } from "../../errors";
 import { assertSafeRelativePath } from "../../paths";
 import type { DbContext, DocumentRecord, FileKind, FileRecord, SqlCommand, SqlValue } from "../types";
+import { insertPendingDocumentCommand } from "./commands";
 import { toDbError } from "./errors";
 
 const FILE_COLUMNS = "id, session_id, name, mime, size, path, kind, created_at";
@@ -61,10 +62,7 @@ export function createFileRepository({ db, ids, now }: DbContext) {
           `INSERT INTO files (${FILE_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
           fileParams(file),
         ],
-        [
-          "INSERT INTO documents (id, file_id, status) VALUES (?, ?, 'pending')",
-          [document.id, file.id],
-        ],
+        insertPendingDocumentCommand(document.id, file.id),
       ];
       try {
         await db.executeBatch(commands);

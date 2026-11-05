@@ -20,8 +20,7 @@ export function createAppFileStorage(): FileStoragePort {
       return { size: destination.exists ? destination.size : null };
     },
 
-    async remove(relativePath, options) {
-      throwIfAborted(options);
+    async remove(relativePath) {
       const file = new File(joinUnderRoot(DOCUMENTS_ROOT, relativePath));
       if (file.exists) {
         file.delete();

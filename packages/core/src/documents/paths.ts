@@ -47,7 +47,7 @@ export function fileRelativePath(
 
 export function safeDisplayName(name: string): string {
   const cleaned = name
-    .replace(/[\u0000-\u001f\u007f\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, "")
+    .replace(/[\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069]/g, "")
     .trim();
   return Array.from(cleaned).slice(0, MAX_NAME_LENGTH).join("") || "Untitled file";
 }
