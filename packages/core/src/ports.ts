@@ -24,3 +24,16 @@ export interface FileStoragePort {
    */
   remove(relativePath: string): Promise<void>;
 }
+
+/**
+ * Platform boundary for reading PDF text. Page numbers are 1-based. Passwords are not
+ * supported in this milestone; encrypted PDFs surface as extraction errors.
+ */
+export interface PdfRequestOptions {
+  readonly signal?: AbortSignal;
+}
+
+export interface PdfPort {
+  getPageCount(fileUri: string, options?: PdfRequestOptions): Promise<number>;
+  extractPage(fileUri: string, page: number, options?: PdfRequestOptions): Promise<string>;
+}
