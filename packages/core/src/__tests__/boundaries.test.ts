@@ -24,7 +24,7 @@ describe("module boundaries", () => {
   });
 
   it("makes core modules reach each other through their entry", () => {
-    const modules = ["db", "engine", "providers"] as const;
+    const modules = ["db", "documents", "engine", "providers"] as const;
     const offenders = filesUnder(coreSrc)
       .filter((file) => !relative(coreSrc, file).startsWith("__tests__"))
       .flatMap((file) => importsOf(file).map((specifier) => ({ file, specifier })))

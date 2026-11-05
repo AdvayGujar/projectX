@@ -26,6 +26,32 @@ export interface Migration {
   statements: string[];
 }
 
+export type FileKind = "pdf" | "docx" | "xlsx" | "pptx" | "image" | "text" | "other";
+
+export interface FileRecord {
+  id: string;
+  sessionId: string;
+  name: string;
+  mime: string;
+  size: number;
+  path: string;
+  kind: FileKind;
+  createdAt: number;
+}
+
+export type DocumentStatus = "pending" | "extracting" | "ready" | "error";
+
+export interface DocumentRecord {
+  id: string;
+  fileId: string;
+  pageCount: number | null;
+  slideCount: number | null;
+  sheetCount: number | null;
+  status: DocumentStatus;
+  error: string | null;
+  extractedAt: number | null;
+}
+
 export type MessageRole = "user" | "assistant" | "system" | "tool";
 export type MessageStatus = "streaming" | "done" | "aborted" | "error";
 export type PartType =

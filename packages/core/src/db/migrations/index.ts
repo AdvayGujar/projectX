@@ -2,11 +2,13 @@ import type { SqlCommand, SqlDatabase, SqlValue, Migration } from "../types";
 import { initialMigration } from "./001-initial";
 import { messageEffortMigration } from "./002-message-effort";
 import { messageSupersededMigration } from "./003-message-superseded";
+import { sessionScopedFilesMigration } from "./004-session-scoped-files";
 
 const migrations: Migration[] = [
   initialMigration,
   messageEffortMigration,
   messageSupersededMigration,
+  sessionScopedFilesMigration,
 ];
 
 export async function migrate(db: SqlDatabase): Promise<number> {

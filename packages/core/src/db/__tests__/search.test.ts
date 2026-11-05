@@ -102,13 +102,15 @@ describe("search repository", () => {
 
   it("finds document chunks with page references", () => withContext(async (ctx) => {
     const projects = createProjectRepository(ctx);
+    const sessions = createSessionRepository(ctx);
     const search = createSearchRepository(ctx);
     const project = await projects.create({ name: "Reports" });
+    const session = await sessions.create({ projectId: project.id });
 
     await ctx.db.execute(
-      `INSERT INTO files (id, project_id, name, mime, size, path, kind, origin, created_at)
-       VALUES ('f', ?, 'report.pdf', 'application/pdf', 100, 'reports/report.pdf', 'pdf', 'import', 1)`,
-      [project.id],
+      `INSERT INTO files (id, session_id, name, mime, size, path, kind, created_at)
+       VALUES ('f', ?, 'report.pdf', 'application/pdf', 100, 'reports/report.pdf', 'pdf', 1)`,
+      [session.id],
     );
     await ctx.db.execute(
       `INSERT INTO documents (id, file_id, page_count, status, extracted_at)
@@ -123,5 +125,37 @@ describe("search repository", () => {
     expect(hits).toHaveLength(1);
     expect(hits[0]?.page).toBe(12);
     expect(hits[0]?.fileId).toBe("f");
+  }));
+
+  it("keeps standalone chunks out of project searches", () => withContext(async (ctx) => {
+    const projects = createProjectRepository(ctx);
+    const sessions = createSessionRepository(ctx);
+    const search = createSearchRepository(ctx);
+    const project = await projects.create({ name: "Reports" });
+    const session = await sessions.create({});
+    const grouped = await sessions.create({ projectId: project.id });
+
+    for (const [fileId, sessionId] of [["loose", session.id], ["grouped", grouped.id]] as const) {
+      await ctx.db.execute(
+        `INSERT INTO files (id, session_id, name, mime, size, path, kind, created_at)
+         VALUES (?, ?, 'report.pdf', 'application/pdf', 100, 'reports/report.pdf', 'pdf', 1)`,
+        [fileId, sessionId],
+      );
+      await ctx.db.execute(
+        `INSERT INTO documents (id, file_id, status) VALUES (?, ?, 'ready')`,
+        [`doc-${fileId}`, fileId],
+      );
+      await ctx.db.execute(
+        `INSERT INTO doc_chunks (id, document_id, ordinal, text, token_estimate)
+         VALUES (?, ?, 1, 'shared keyword', 2)`,
+        [`chunk-${fileId}`, `doc-${fileId}`],
+      );
+    }
+
+    expect(await search.chunks("keyword")).toHaveLength(2);
+    const hits = await search.chunks("keyword", { projectId: project.id });
+    expect(hits.map((hit) => hit.fileId)).toEqual(["grouped"]);
+    const standalone = await search.chunks("keyword", { projectId: null });
+    expect(standalone.map((hit) => hit.fileId)).toEqual(["loose"]);
   }));
 });
