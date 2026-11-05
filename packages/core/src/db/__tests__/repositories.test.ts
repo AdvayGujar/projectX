@@ -64,6 +64,47 @@ describe("session repository", () => {
     expect(updated.pinned).toBe(true);
   }));
 
+  it("moves a session into a project", () => withContext(async (ctx) => {
+    const projects = createProjectRepository(ctx);
+    const sessions = createSessionRepository(ctx);
+    const project = await projects.create({ name: "Novel" });
+    const session = await sessions.create({});
+
+    const moved = await sessions.update(session.id, { projectId: project.id });
+    expect(moved.projectId).toBe(project.id);
+    expect((await sessions.listByProject(project.id)).map((item) => item.id)).toEqual([session.id]);
+  }));
+
+  it("moves a session back out of a project", () => withContext(async (ctx) => {
+    const projects = createProjectRepository(ctx);
+    const sessions = createSessionRepository(ctx);
+    const project = await projects.create({ name: "Novel" });
+    const session = await sessions.create({ projectId: project.id });
+
+    const moved = await sessions.update(session.id, { projectId: null });
+    expect(moved.projectId).toBeNull();
+    expect(await sessions.listByProject(project.id)).toHaveLength(0);
+    expect((await sessions.listByProject(null)).map((item) => item.id)).toEqual([session.id]);
+  }));
+
+  it("lists pinned sessions first in recent and project lists", () => withContext(async (ctx) => {
+    const projects = createProjectRepository(ctx);
+    const sessions = createSessionRepository(ctx);
+    const project = await projects.create({ name: "Novel" });
+    const pinned = await sessions.create({ projectId: project.id, title: "Pinned" });
+    const newest = await sessions.create({ projectId: project.id, title: "Newest" });
+    const archived = await sessions.create({ projectId: project.id, title: "Archived" });
+
+    await sessions.update(pinned.id, { pinned: true });
+    await sessions.update(archived.id, { archived: true });
+
+    expect((await sessions.listByProject(project.id)).map((item) => item.id)).toEqual([
+      pinned.id,
+      newest.id,
+    ]);
+    expect((await sessions.listRecent()).map((item) => item.id)).toEqual([pinned.id, newest.id]);
+  }));
+
   it("cascades messages when a session is removed", () => withContext(async (ctx) => {
     const sessions = createSessionRepository(ctx);
     const messages = createMessageRepository(ctx);

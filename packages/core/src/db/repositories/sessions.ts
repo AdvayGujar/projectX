@@ -25,6 +25,7 @@ export interface CreateSessionInput {
 }
 
 export interface UpdateSessionInput {
+  projectId?: string | null;
   title?: string;
   providerId?: string | null;
   modelId?: string | null;
@@ -68,7 +69,7 @@ export function createSessionRepository({ db, ids, now }: DbContext) {
       const result = await db.execute(
         `SELECT * FROM sessions
          WHERE project_id IS ? AND archived IN (0, ?)
-         ORDER BY COALESCE(last_message_at, created_at) DESC`,
+         ORDER BY pinned DESC, COALESCE(last_message_at, created_at) DESC`,
         [projectId, archived],
       );
       return result.rows.map((row) => mapSession(row as unknown as SessionRow));
@@ -79,7 +80,7 @@ export function createSessionRepository({ db, ids, now }: DbContext) {
       const result = await db.execute(
         `SELECT * FROM sessions
          WHERE archived IN (0, ?)
-         ORDER BY COALESCE(last_message_at, created_at) DESC
+         ORDER BY pinned DESC, COALESCE(last_message_at, created_at) DESC
          LIMIT ?`,
         [archived, Math.max(1, Math.min(limit, 200))],
       );
@@ -138,6 +139,10 @@ async function getSession(db: SqlDatabase, id: string): Promise<Session | null> 
 function buildUpdate(patch: UpdateSessionInput, timestamp: number): { fields: string[]; params: SqlValue[] } | null {
   const fields: string[] = [];
   const params: SqlValue[] = [];
+  if (patch.projectId !== undefined) {
+    fields.push("project_id = ?");
+    params.push(patch.projectId);
+  }
   if (patch.title !== undefined) {
     fields.push("title = ?");
     params.push(patch.title.trim() || "New chat");
