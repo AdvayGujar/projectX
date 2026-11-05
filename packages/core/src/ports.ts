@@ -23,6 +23,11 @@ export interface FileStoragePort {
    * signal: rollback must run even when the import was aborted.
    */
   remove(relativePath: string): Promise<void>;
+  /**
+   * Removes a sandbox directory and everything inside it. A missing directory is not an
+   * error. Deleting a chat uses this to clear its session folder after the rows are gone.
+   */
+  removeDirectory(relativePath: string): Promise<void>;
 }
 
 /**
