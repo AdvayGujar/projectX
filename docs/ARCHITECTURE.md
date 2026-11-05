@@ -33,7 +33,7 @@ apps/mobile/
   src/
     db/client.ts                one op-sqlite connection, migrations first
     navigation/                 drawer content, openDrawer
-    services/                   providerService · sessionQueries · turnService · keyStore
+    services/                   providerService · sessionQueries · turnService · keyStore · fileStorage
     state/                      modelStore · sessionStore · sessionsStore · useModelCatalog
     screens/                    shared screen scaffolding
     spike/                      throwaway M0 checks
@@ -41,7 +41,9 @@ apps/mobile/
 packages/core/src/
   providers/                    four wire-protocol adapters + catalog + registry
   engine/                       turn loop, context assembly, streamed parts
+  documents/                    sandbox path policy, kind detection, file importer
   db/                           schema, migrations, repositories, FTS search
+  ports.ts                      platform boundaries (file storage)
 
 packages/ui/src/
   theme.ts  types.ts  icons.tsx
@@ -68,6 +70,16 @@ component and the screen that composes it.
 2. **Declare it in `app/_layout.tsx` with `<Drawer.Screen name="…" />`.** Expo Router 58 does
    not infer drawer screens from the file tree; an undeclared route renders a white screen.
 3. If it is top level, add it to `DESTINATIONS` in `src/navigation/DrawerShell.tsx`.
+
+### Import a file
+
+1. Core owns the record and the path policy: `documents/paths.ts` builds
+   `sessions/<sessionId>/files/<fileId>.<ext>`, `documents/import.ts` copies through the
+   `FileStoragePort` and writes the `files` then `documents` rows.
+2. The app supplies the port with `createAppFileStorage()` from
+   `apps/mobile/src/services/fileStorage.ts`.
+3. Picker URIs and file names never become paths. Only the validated relative path crosses
+   the port, so `..`, absolute paths, and symlink escapes are rejected in core.
 
 ### Add a provider
 
@@ -144,6 +156,8 @@ the import graph; it fails CI if a deep import appears.
 
 ## Conventions worth repeating
 
+- Imported files and generated artifacts are session-owned. Projects aggregate them by joining
+  through `sessions`; neither table carries a `project_id`.
 - One public entry per module: `index.ts`.
 - Discriminated unions over boolean flags; `readonly` on anything crossing a boundary.
 - `unknown` + Zod at every external boundary (provider responses, DB JSON, file contents).
