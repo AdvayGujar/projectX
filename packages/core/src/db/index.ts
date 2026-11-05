@@ -1,3 +1,5 @@
+export { createChunkRepository } from "./repositories/chunks";
+export type { ChunkDraft, ChunkRepository } from "./repositories/chunks";
 export { createDbContext } from "./context";
 export type { DbContextOptions } from "./context";
 export { createDocumentRepository } from "./repositories/documents";
@@ -42,6 +44,7 @@ export type {
 export type {
   Clock,
   DbContext,
+  DocChunk,
   DocumentRecord,
   DocumentStatus,
   FileKind,

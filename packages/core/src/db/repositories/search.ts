@@ -68,7 +68,7 @@ export function createSearchRepository({ db }: DbContext) {
          JOIN documents d ON d.id = c.document_id
          JOIN files f ON f.id = d.file_id
          JOIN sessions s ON s.id = f.session_id
-         WHERE doc_chunks_fts MATCH ?${filter}
+         WHERE doc_chunks_fts MATCH ? AND d.status = 'ready'${filter}
          ORDER BY rank
          LIMIT ?`,
         [match, ...params, limitOf(options)],

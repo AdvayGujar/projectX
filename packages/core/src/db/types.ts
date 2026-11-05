@@ -52,6 +52,16 @@ export interface DocumentRecord {
   extractedAt: number | null;
 }
 
+export interface DocChunk {
+  id: string;
+  documentId: string;
+  ordinal: number;
+  page: number | null;
+  section: string | null;
+  text: string;
+  tokenEstimate: number;
+}
+
 export type MessageRole = "user" | "assistant" | "system" | "tool";
 export type MessageStatus = "streaming" | "done" | "aborted" | "error";
 export type PartType =

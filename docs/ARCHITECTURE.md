@@ -33,7 +33,7 @@ apps/mobile/
   src/
     db/client.ts                one op-sqlite connection, migrations first
     navigation/                 drawer content, openDrawer
-    services/                   providerService · sessionQueries · turnService · keyStore · fileStorage
+    services/                   providerService · sessionQueries · turnService · keyStore · fileStorage · pdfExtractor
     state/                      modelStore · sessionStore · sessionsStore · useModelCatalog
     screens/                    shared screen scaffolding
     spike/                      throwaway M0 checks
@@ -41,10 +41,10 @@ apps/mobile/
 packages/core/src/
   providers/                    four wire-protocol adapters + catalog + registry
   engine/                       turn loop, context assembly, streamed parts
-  documents/                    sandbox path policy, kind detection, file importer
+  documents/                    path policy, kind detection, file importer, chunking, PDF extraction
   db/                           schema, migrations, repositories, FTS search
   paths.ts                      shared relative-path validation for db and documents
-  ports.ts                      platform boundaries (file storage)
+  ports.ts                      platform boundaries (file storage, PDF)
 
 packages/ui/src/
   theme.ts  types.ts  icons.tsx
@@ -83,6 +83,20 @@ component and the screen that composes it.
 3. Picker URIs and file names never become paths. Core rejects `..`, absolute paths,
    backslashes, and control characters; the adapter only joins validated relative paths
    under `Paths.document`.
+
+### Extract a PDF
+
+1. `PdfPort` lives in `packages/core/src/ports.ts`; the mobile adapter is
+   `apps/mobile/src/services/pdfExtractor.ts` (`expo-pdf-text-extract`, 30 s timeout,
+   abort checks around each native call).
+2. `createPdfExtractionService` reads page by page, chunks 800–1200 tokens with ~15%
+   overlap and never across pages, replaces `doc_chunks` in one transaction, and moves the
+   document through `extracting` to `ready`, `error`, or back to `pending` on abort.
+3. The existing `doc_chunks` FTS triggers do the indexing; query with
+   `createSearchRepository(ctx).chunks(...)`. Only documents in `ready` are searchable, so a
+   failed or aborted re-extraction keeps the last successful chunks but hides them from search.
+4. No screen wires extraction yet. It lands with `read_document` in M3 so the engine has a
+   document input path.
 
 ### Add a provider
 
