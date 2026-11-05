@@ -7,7 +7,7 @@ describe("migrations", () => {
   it("applies once and is idempotent", async () => {
     const db = createNodeDatabase();
     try {
-      expect(await migrate(db)).toBe(3);
+      expect(await migrate(db)).toBe(4);
       expect(await migrate(db)).toBe(0);
     } finally {
       await db.close();
@@ -41,6 +41,31 @@ describe("migrations", () => {
       const columns = result.rows.map((row) => String(row.name));
       expect(columns).toContain("effort");
       expect(columns).toContain("superseded");
+    });
+  });
+
+  it("owns files and artifacts by session, not project", async () => {
+    await withContext(async ({ db }) => {
+      const files = await db.execute("PRAGMA table_info(files)");
+      const fileColumns = files.rows.map((row) => String(row.name));
+      expect(fileColumns).toContain("session_id");
+      expect(fileColumns).not.toContain("project_id");
+      expect(fileColumns).not.toContain("origin");
+
+      const artifacts = await db.execute("PRAGMA table_info(artifacts)");
+      const artifactColumns = artifacts.rows.map((row) => String(row.name));
+      expect(artifactColumns).toContain("session_id");
+      expect(artifactColumns).not.toContain("project_id");
+
+      const indexes = await db.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'index' ORDER BY name",
+      );
+      const names = indexes.rows.map((row) => String(row.name));
+      expect(names).toContain("idx_files_session");
+      expect(names).toContain("idx_artifacts_session");
+      expect(names).toContain("idx_documents_file");
+      expect(names).not.toContain("idx_files_project");
+      expect(names).not.toContain("idx_artifacts_project");
     });
   });
 

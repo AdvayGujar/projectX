@@ -58,7 +58,7 @@ export function createSearchRepository({ db }: DbContext) {
       if (!match) {
         return [];
       }
-      const { filter, params } = buildFilter(options.projectId, "f.project_id");
+      const { filter, params } = buildFilter(options.projectId, "s.project_id");
       const result = await db.execute(
         `SELECT c.id AS chunk_id, c.document_id, d.file_id, c.page, c.section,
                 snippet(doc_chunks_fts, 0, '[', ']', '…', 12) AS snippet,
@@ -67,6 +67,7 @@ export function createSearchRepository({ db }: DbContext) {
          JOIN doc_chunks c ON c.rowid = doc_chunks_fts.rowid
          JOIN documents d ON d.id = c.document_id
          JOIN files f ON f.id = d.file_id
+         JOIN sessions s ON s.id = f.session_id
          WHERE doc_chunks_fts MATCH ?${filter}
          ORDER BY rank
          LIMIT ?`,

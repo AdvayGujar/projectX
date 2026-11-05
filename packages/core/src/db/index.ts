@@ -1,5 +1,13 @@
 export { createDbContext } from "./context";
 export type { DbContextOptions } from "./context";
+export { createDocumentRepository } from "./repositories/documents";
+export type {
+  CreateDocumentInput,
+  DocumentRepository,
+  UpdateDocumentInput,
+} from "./repositories/documents";
+export { createFileRepository } from "./repositories/files";
+export type { AddFileInput, FileRepository } from "./repositories/files";
 export { migrate, migrations } from "./migrations";
 export { createMessageRepository } from "./repositories/messages";
 export type {
@@ -34,6 +42,10 @@ export type {
 export type {
   Clock,
   DbContext,
+  DocumentRecord,
+  DocumentStatus,
+  FileKind,
+  FileRecord,
   IdFactory,
   Message,
   MessageRole,
