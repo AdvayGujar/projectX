@@ -76,10 +76,10 @@ function toRecord(draft: ChunkDraft, documentId: string, id: string): DocChunk {
     id,
     documentId,
     ordinal: requireOrdinal(draft.ordinal),
-    page: draft.page,
+    page: requirePage(draft.page),
     section: draft.section,
     text: requireText(draft.text),
-    tokenEstimate: draft.tokenEstimate,
+    tokenEstimate: requireTokenEstimate(draft.tokenEstimate),
   };
 }
 
@@ -117,6 +117,27 @@ function requireOrdinal(ordinal: number): number {
     });
   }
   return ordinal;
+}
+
+function requirePage(page: number | null): number | null {
+  if (page === null) {
+    return null;
+  }
+  if (!Number.isInteger(page) || page < 1) {
+    throw new AppError("db_invalid", `Invalid chunk page: ${page}`, {
+      userMessage: "The document text could not be saved.",
+    });
+  }
+  return page;
+}
+
+function requireTokenEstimate(value: number): number {
+  if (!Number.isInteger(value) || value < 0) {
+    throw new AppError("db_invalid", `Invalid chunk token estimate: ${value}`, {
+      userMessage: "The document text could not be saved.",
+    });
+  }
+  return value;
 }
 
 function requireText(text: string): string {

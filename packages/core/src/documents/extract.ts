@@ -4,6 +4,8 @@ import { AppError } from "../errors";
 import type { PdfPort } from "../ports";
 import { chunkPages } from "./chunking";
 
+const MAX_PAGES = 5_000;
+
 export type PdfExtractionResult =
   | { readonly status: "ready"; readonly pageCount: number; readonly chunkCount: number }
   | { readonly status: "cancelled" }
@@ -11,6 +13,7 @@ export type PdfExtractionResult =
 
 export interface PdfExtractionInput {
   readonly documentId: string;
+  /** Must be resolved from the stored file record; never a picker URI. */
   readonly fileUri: string;
   readonly signal?: AbortSignal;
 }
@@ -37,9 +40,14 @@ export function createPdfExtractionService(
       try {
         throwIfAborted(input.signal);
         const pageCount = await pdf.getPageCount(input.fileUri, { signal: input.signal });
-        if (!Number.isInteger(pageCount) || pageCount < 0) {
+        if (!Number.isInteger(pageCount) || pageCount < 1) {
           throw new AppError("unknown", `Invalid PDF page count: ${pageCount}`, {
             userMessage: "Could not read this PDF.",
+          });
+        }
+        if (pageCount > MAX_PAGES) {
+          throw new AppError("unknown", `PDF has too many pages: ${pageCount}`, {
+            userMessage: `This PDF has more than ${MAX_PAGES} pages.`,
           });
         }
         const drafts = await extractPages(pdf, input, pageCount);

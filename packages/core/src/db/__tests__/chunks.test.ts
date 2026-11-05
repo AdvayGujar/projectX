@@ -105,6 +105,14 @@ describe("chunk repository", () => {
       { ordinal: 0, page: 1, section: null, text: "text", tokenEstimate: 1 },
     ])).rejects.toMatchObject({ code: "db_invalid" });
 
+    await expect(chunks.replaceForDocument(documentId, [
+      { ordinal: 1, page: 0, section: null, text: "text", tokenEstimate: 1 },
+    ])).rejects.toMatchObject({ code: "db_invalid" });
+
+    await expect(chunks.replaceForDocument(documentId, [
+      { ordinal: 1, page: 1, section: null, text: "text", tokenEstimate: -1 },
+    ])).rejects.toMatchObject({ code: "db_invalid" });
+
     expect(await chunks.count(documentId)).toBe(0);
   }));
 
@@ -121,10 +129,35 @@ describe("chunk repository", () => {
     expect(await chunks.listByDocument(documentId)).toEqual([]);
   }));
 
-  it("indexes chunks for full-text search", () => withContext(async (ctx) => {
+  it("rolls back the delete when an insert fails", () => withContext(async (ctx) => {
+    const { documentId } = await seedDocument(ctx);
+    const chunks = createChunkRepository(ctx);
+    const documents = createDocumentRepository(ctx);
+    const search = createSearchRepository(ctx);
+
+    await chunks.replaceForDocument(documentId, [
+      { ordinal: 1, page: 1, section: null, text: "original keyword", tokenEstimate: 2 },
+    ]);
+    await documents.update(documentId, { status: "ready" });
+    expect(await search.chunks("original")).toHaveLength(1);
+
+    await expect(chunks.replaceForDocument(documentId, [
+      { ordinal: 1, page: 1, section: null, text: "first", tokenEstimate: 1 },
+      { ordinal: 1, page: 1, section: null, text: "duplicate", tokenEstimate: 1 },
+    ])).rejects.toMatchObject({ code: "db_constraint" });
+
+    expect((await chunks.listByDocument(documentId)).map((chunk) => chunk.text)).toEqual([
+      "original keyword",
+    ]);
+    expect(await search.chunks("original")).toHaveLength(1);
+  }));
+
+  it("indexes chunks for full-text search once the document is ready", () => withContext(async (ctx) => {
     const { fileId, documentId } = await seedDocument(ctx);
     const chunks = createChunkRepository(ctx);
+    const documents = createDocumentRepository(ctx);
     await chunks.replaceForDocument(documentId, chunkPages(pdfPages));
+    await documents.update(documentId, { status: "ready" });
 
     const hits = await createSearchRepository(ctx).chunks("photovoltaic");
 
@@ -134,22 +167,44 @@ describe("chunk repository", () => {
     expect(hits[0]?.page).toBe(2);
   }));
 
-  it("cascades chunks when the document or its file is deleted", () => withContext(async (ctx) => {
+  it("hides chunks from search until extraction is ready", () => withContext(async (ctx) => {
+    const { documentId } = await seedDocument(ctx);
+    const chunks = createChunkRepository(ctx);
+    const documents = createDocumentRepository(ctx);
+    const search = createSearchRepository(ctx);
+
+    await chunks.replaceForDocument(documentId, [
+      { ordinal: 1, page: 1, section: null, text: "pending keyword", tokenEstimate: 2 },
+    ]);
+    expect(await search.chunks("pending")).toHaveLength(0);
+
+    await documents.update(documentId, { status: "ready" });
+    expect(await search.chunks("pending")).toHaveLength(1);
+  }));
+
+  it("cascades chunks and FTS entries when the document or its file is deleted", () => withContext(async (ctx) => {
     const first = await seedDocument(ctx);
     const second = await seedDocument(ctx);
     const chunks = createChunkRepository(ctx);
+    const documents = createDocumentRepository(ctx);
     const files = createFileRepository(ctx);
+    const search = createSearchRepository(ctx);
     const documentChunk = [
-      { ordinal: 1, page: 1, section: null, text: "cascade keyword", tokenEstimate: 1 },
+      { ordinal: 1, page: 1, section: null, text: "cascade keyword", tokenEstimate: 2 },
     ];
 
     await chunks.replaceForDocument(first.documentId, documentChunk);
     await chunks.replaceForDocument(second.documentId, documentChunk);
+    await documents.update(first.documentId, { status: "ready" });
+    await documents.update(second.documentId, { status: "ready" });
+    expect(await search.chunks("cascade")).toHaveLength(2);
 
     await ctx.db.execute("DELETE FROM documents WHERE id = ?", [first.documentId]);
     expect(await chunks.count(first.documentId)).toBe(0);
+    expect(await search.chunks("cascade")).toHaveLength(1);
 
     await files.remove(second.fileId);
     expect(await chunks.count(second.documentId)).toBe(0);
+    expect(await search.chunks("cascade")).toHaveLength(0);
   }));
 });

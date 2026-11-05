@@ -88,6 +88,58 @@ describe("expo PDF port", () => {
     }
   });
 
+  it("clears the timeout after a successful call", async () => {
+    jest.useFakeTimers();
+    try {
+      mockedGetPageCount.mockResolvedValue(7);
+      const port = createExpoPdfPort();
+
+      await expect(port.getPageCount(REPORT)).resolves.toBe(7);
+      expect(jest.getTimerCount()).toBe(0);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("prefers cancellation over availability", async () => {
+    mockedIsAvailable.mockReturnValue(false);
+    const controller = new AbortController();
+    controller.abort();
+    const port = createExpoPdfPort();
+
+    await expect(
+      port.getPageCount(REPORT, { signal: controller.signal }),
+    ).rejects.toMatchObject({ code: "cancelled" });
+    expect(mockedGetPageCount).not.toHaveBeenCalled();
+  });
+
+  it("maps a page-specific native error", async () => {
+    mockedExtractPage.mockImplementation(() =>
+      Promise.reject({ code: "PDF_PAGE_ERROR" }),
+    );
+    const port = createExpoPdfPort();
+
+    await expect(port.extractPage(REPORT, 3)).rejects.toMatchObject({
+      userMessage: "This PDF page could not be read.",
+    });
+  });
+
+  it("maps synchronous throws and non-Error rejections", async () => {
+    const port = createExpoPdfPort();
+
+    mockedGetPageCount.mockImplementation(() => {
+      throw new Error("sync failure");
+    });
+    await expect(port.getPageCount(REPORT)).rejects.toMatchObject({
+      userMessage: "Could not read this PDF.",
+    });
+
+    mockedExtractPage.mockImplementation(() => Promise.reject("string failure"));
+    await expect(port.extractPage(REPORT, 1)).rejects.toMatchObject({
+      userMessage: "Could not read this PDF.",
+    });
+  });
+
   it("maps password errors to a readable message", async () => {
     mockedGetPageCount.mockImplementation(() =>
       Promise.reject({ code: "PASSWORD_REQUIRED" }),

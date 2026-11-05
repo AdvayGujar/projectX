@@ -93,7 +93,8 @@ component and the screen that composes it.
    overlap and never across pages, replaces `doc_chunks` in one transaction, and moves the
    document through `extracting` to `ready`, `error`, or back to `pending` on abort.
 3. The existing `doc_chunks` FTS triggers do the indexing; query with
-   `createSearchRepository(ctx).chunks(...)`.
+   `createSearchRepository(ctx).chunks(...)`. Only documents in `ready` are searchable, so a
+   failed or aborted re-extraction keeps the last successful chunks but hides them from search.
 4. No screen wires extraction yet. It lands with `read_document` in M3 so the engine has a
    document input path.
 

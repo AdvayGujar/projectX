@@ -103,4 +103,14 @@ describe("chunkPages", () => {
     }
     expect(chunks.map((chunk) => chunk.text).join("")).toBe(text);
   });
+
+  it("terminates with fractional token options", () => {
+    const chunks = chunkPages([{ page: 1, text: numberOfWords(100) }], {
+      targetTokens: 0.5,
+      minTokens: 0.5,
+      maxTokens: 0.5,
+    });
+
+    expect(chunks.length).toBeGreaterThan(0);
+  });
 });

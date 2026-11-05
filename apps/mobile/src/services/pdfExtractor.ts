@@ -28,8 +28,8 @@ async function runNative<T>(
   options: PdfRequestOptions | undefined,
   call: () => Promise<T>,
 ): Promise<T> {
-  ensureAvailable();
   throwIfAborted(options?.signal);
+  ensureAvailable();
 
   try {
     const result = await withTimeout(call(), options?.signal);
@@ -117,6 +117,12 @@ function toPdfError(error: unknown): AppError {
     return new AppError("unknown", "PDF is corrupt", {
       cause: error,
       userMessage: "This PDF could not be read.",
+    });
+  }
+  if (code === "PDF_PAGE_ERROR") {
+    return new AppError("unknown", "PDF page could not be read", {
+      cause: error,
+      userMessage: "This PDF page could not be read.",
     });
   }
   return new AppError("unknown", "Could not read the PDF", {

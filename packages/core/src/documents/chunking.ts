@@ -21,6 +21,8 @@ const DEFAULTS = {
   overlapRatio: 0.15,
 } satisfies Required<ChunkOptions>;
 
+const MAX_OVERLAP_RATIO = 0.5;
+
 interface NormalizedOptions {
   readonly targetTokens: number;
   readonly minTokens: number;
@@ -42,7 +44,9 @@ interface WordRange {
 /**
  * Splits each page independently: chunks never cross a page boundary, so every citation can
  * point at one page. Pages that fit inside the budget stay whole; longer pages are split on
- * word boundaries and overlap by trailing words.
+ * word boundaries and overlap by trailing words. The final chunk of a page may be shorter
+ * than `minTokens` when merging would exceed `maxTokens`, and pathological unbroken tokens
+ * can leave a short neighbour. Both are preferable to crossing a page or overshooting.
  */
 export function chunkPages(
   pages: readonly PdfPageText[],
@@ -224,12 +228,12 @@ function positive(value: number | undefined, fallback: number): number {
   if (value === undefined || !Number.isFinite(value) || value <= 0) {
     return fallback;
   }
-  return Math.floor(value);
+  return Math.max(1, Math.floor(value));
 }
 
 function clampRatio(value: number | undefined): number {
   if (value === undefined || !Number.isFinite(value)) {
     return DEFAULTS.overlapRatio;
   }
-  return Math.min(Math.max(value, 0), 1);
+  return Math.min(Math.max(value, 0), MAX_OVERLAP_RATIO);
 }

@@ -170,9 +170,9 @@ describe("PDF extraction service", () => {
     expect(await createChunkRepository(ctx).count(documentId)).toBe(0);
   }));
 
-  it("rejects an invalid page count", () => withContext(async (ctx) => {
+  it.each([-1, 0, 5_001])("rejects page count %i", (pageCount) => withContext(async (ctx) => {
     const { fileUri, documentId } = await seedDocument(ctx);
-    const pdf = createFakePdf(["First page."], { pageCount: -1 });
+    const pdf = createFakePdf(["First page."], { pageCount });
     const service = createPdfExtractionService(ctx, pdf);
 
     const result = await service.extract({ documentId, fileUri });
@@ -181,13 +181,13 @@ describe("PDF extraction service", () => {
     if (result.status !== "error") {
       throw new Error("expected an error result");
     }
-    expect(result.error.userMessage).toBe("Could not read this PDF.");
+    expect(result.error.userMessage).toMatch(/Could not read this PDF|more than 5000 pages/);
     const document = await createDocumentRepository(ctx).get(documentId);
     expect(document?.status).toBe("error");
     expect(pdf.calls).toEqual([`count:${fileUri}`]);
   }));
 
-  it("replaces previous chunks on re-extraction and updates FTS", () => withContext(async (ctx) => {
+  it("keeps the last successful chunks but hides them when re-extraction fails", () => withContext(async (ctx) => {
     const { fileUri, documentId } = await seedDocument(ctx);
     const search = createSearchRepository(ctx);
 
@@ -195,11 +195,16 @@ describe("PDF extraction service", () => {
       .extract({ documentId, fileUri });
     expect(await search.chunks("apples")).toHaveLength(1);
 
-    await createPdfExtractionService(ctx, createFakePdf(["new bananas"]))
-      .extract({ documentId, fileUri });
+    const failed = await createPdfExtractionService(
+      ctx,
+      createFakePdf(["new bananas"], { failPage: 1 }),
+    ).extract({ documentId, fileUri });
 
-    expect(await search.chunks("apples")).toHaveLength(0);
-    expect(await search.chunks("bananas")).toHaveLength(1);
+    expect(failed.status).toBe("error");
     expect(await createChunkRepository(ctx).count(documentId)).toBe(1);
+    expect(await createDocumentRepository(ctx).get(documentId)).toMatchObject({
+      status: "error",
+    });
+    expect(await search.chunks("apples")).toHaveLength(0);
   }));
 });
