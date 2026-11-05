@@ -23,7 +23,7 @@ if ! command -v xcodebuild >/dev/null 2>&1; then
 fi
 
 if ! xcrun simctl list devices booted | grep -q "Booted"; then
-  echo "Booting $device…"
+  echo "Booting ${device}…"
   if ! xcrun simctl boot "$device" >/dev/null 2>&1; then
     echo "Could not boot '$device'. Set IOS_DEVICE to an installed simulator name." >&2
     exit 1
