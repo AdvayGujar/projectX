@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { DbContext } from "../../db";
 import { createFileRepository, createSessionRepository } from "../../db";
+import { AppError } from "../../index";
 import type { FileStorageOptions } from "../../ports";
 import { createFileImporter } from "../index";
 import { withContext } from "../../db/__tests__/helpers";
@@ -9,31 +10,34 @@ import { withContext } from "../../db/__tests__/helpers";
 interface FakeStorage {
   readonly copies: Array<{ sourceUri: string; relativePath: string }>;
   readonly removed: string[];
+  lastOptions?: FileStorageOptions;
   copyFromUri(
     sourceUri: string,
     relativePath: string,
     options?: FileStorageOptions,
   ): Promise<{ size: number | null }>;
-  remove(relativePath: string, options?: FileStorageOptions): Promise<void>;
+  remove(relativePath: string): Promise<void>;
 }
 
 function createFakeStorage(options: { failCopy?: boolean } = {}): FakeStorage {
   const copies: Array<{ sourceUri: string; relativePath: string }> = [];
   const removed: string[] = [];
-  return {
+  const storage: FakeStorage = {
     copies,
     removed,
-    async copyFromUri(sourceUri, relativePath, _options) {
+    async copyFromUri(sourceUri, relativePath, copyOptions) {
+      storage.lastOptions = copyOptions;
       copies.push({ sourceUri, relativePath });
       if (options.failCopy) {
         throw new Error("copy failed");
       }
       return { size: 2048 };
     },
-    async remove(relativePath, _options) {
+    async remove(relativePath) {
       removed.push(relativePath);
     },
   };
+  return storage;
 }
 
 function failingDocumentDb(ctx: DbContext): DbContext {
@@ -84,7 +88,8 @@ describe("file importer", () => {
     const sessions = createSessionRepository(ctx);
     const session = await sessions.create({});
     const storage = createFakeStorage();
-    storage.copyFromUri = async (sourceUri, relativePath, _options) => {
+    storage.copyFromUri = async (sourceUri, relativePath, copyOptions) => {
+      storage.lastOptions = copyOptions;
       storage.copies.push({ sourceUri, relativePath });
       return { size: null };
     };
@@ -106,7 +111,8 @@ describe("file importer", () => {
     const sessions = createSessionRepository(ctx);
     const session = await sessions.create({});
     const storage = createFakeStorage();
-    storage.copyFromUri = async (sourceUri, relativePath, _options) => {
+    storage.copyFromUri = async (sourceUri, relativePath, copyOptions) => {
+      storage.lastOptions = copyOptions;
       storage.copies.push({ sourceUri, relativePath });
       return { size: 0 };
     };
@@ -159,7 +165,8 @@ describe("file importer", () => {
     const session = await sessions.create({});
     const storage = createFakeStorage();
     const controller = new AbortController();
-    storage.copyFromUri = async (sourceUri, relativePath, _options) => {
+    storage.copyFromUri = async (sourceUri, relativePath, copyOptions) => {
+      storage.lastOptions = copyOptions;
       storage.copies.push({ sourceUri, relativePath });
       controller.abort();
       return { size: 12 };
@@ -171,6 +178,30 @@ describe("file importer", () => {
       name: "report.pdf",
       mime: "application/pdf",
       signal: controller.signal,
+    })).rejects.toMatchObject({ code: "cancelled" });
+
+    expect(storage.lastOptions?.signal).toBe(controller.signal);
+    expect(storage.removed).toEqual([storage.copies[0]?.relativePath]);
+    expect(await createFileRepository(ctx).listBySession(session.id)).toEqual([]);
+  }));
+
+  it("removes a partial copy when the port cancels mid-copy", () => withContext(async (ctx) => {
+    const sessions = createSessionRepository(ctx);
+    const session = await sessions.create({});
+    const storage = createFakeStorage();
+    storage.copyFromUri = async (sourceUri, relativePath, copyOptions) => {
+      storage.lastOptions = copyOptions;
+      storage.copies.push({ sourceUri, relativePath });
+      throw new AppError("cancelled", "cancelled mid-copy", {
+        userMessage: "Import cancelled.",
+      });
+    };
+
+    await expect(createFileImporter(ctx, storage).import({
+      sessionId: session.id,
+      sourceUri: "file:///picker/report.pdf",
+      name: "report.pdf",
+      mime: "application/pdf",
     })).rejects.toMatchObject({ code: "cancelled" });
 
     expect(storage.removed).toEqual([storage.copies[0]?.relativePath]);

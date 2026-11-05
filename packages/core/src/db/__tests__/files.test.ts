@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createDbContext,
   createDocumentRepository,
   createFileRepository,
   createProjectRepository,
   createSessionRepository,
+  migrate,
 } from "../index";
-import { withContext } from "./helpers";
+import { createNodeDatabase, withContext } from "./helpers";
 
 async function addFile(
   ctx: Parameters<typeof createFileRepository>[0],
@@ -113,6 +115,47 @@ describe("file repository", () => {
     expect(result.document).toMatchObject({ fileId: id, status: "pending" });
     expect(await documents.getByFile(id)).toMatchObject({ id: result.document.id });
   }));
+
+  it("rolls back the file row when the document insert fails", async () => {
+    const db = createNodeDatabase();
+    try {
+      await migrate(db);
+      let sequence = 0;
+      const ctx = createDbContext(db, {
+        ids: () => `id-${(sequence += 1)}`,
+        now: () => 1_700_000_000_000,
+      });
+      const sessions = createSessionRepository(ctx);
+      const files = createFileRepository(ctx);
+      const documents = createDocumentRepository(ctx);
+      const session = await sessions.create({});
+
+      await ctx.db.execute(
+        `INSERT INTO files (id, session_id, name, mime, size, path, kind, created_at)
+         VALUES ('seed-file', ?, 'seed.pdf', 'application/pdf', 1,
+                 'sessions/${session.id}/files/seed-file.pdf', 'pdf', 1)`,
+        [session.id],
+      );
+      await ctx.db.execute(
+        "INSERT INTO documents (id, file_id, status) VALUES ('id-2', 'seed-file', 'pending')",
+      );
+
+      await expect(files.addWithDocument({
+        id: "file-2",
+        sessionId: session.id,
+        name: "report.pdf",
+        mime: "application/pdf",
+        size: 10,
+        path: `sessions/${session.id}/files/file-2.pdf`,
+        kind: "pdf",
+      })).rejects.toMatchObject({ code: "db_constraint" });
+
+      expect(await files.get("file-2")).toBeNull();
+      expect(await documents.getByFile("file-2")).toBeNull();
+    } finally {
+      await db.close();
+    }
+  });
 
   it("removes a file row directly", () => withContext(async (ctx) => {
     const sessions = createSessionRepository(ctx);

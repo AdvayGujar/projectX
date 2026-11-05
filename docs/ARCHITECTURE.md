@@ -43,6 +43,7 @@ packages/core/src/
   engine/                       turn loop, context assembly, streamed parts
   documents/                    sandbox path policy, kind detection, file importer
   db/                           schema, migrations, repositories, FTS search
+  paths.ts                      shared relative-path validation for db and documents
   ports.ts                      platform boundaries (file storage)
 
 packages/ui/src/
@@ -74,8 +75,9 @@ component and the screen that composes it.
 ### Import a file
 
 1. Core owns the record and the path policy: `documents/paths.ts` builds
-   `sessions/<sessionId>/files/<fileId>.<ext>`, `documents/import.ts` copies through the
-   `FileStoragePort` and writes the `files` then `documents` rows.
+   `sessions/<sessionId>/files/<fileId>.<ext>`, the root `paths.ts` validates relative paths
+   for both `db` and `documents`, and `documents/import.ts` copies through the
+   `FileStoragePort` and writes the `files` and pending `documents` rows in one batch.
 2. The app supplies the port with `createAppFileStorage()` from
    `apps/mobile/src/services/fileStorage.ts`.
 3. Picker URIs and file names never become paths. Core rejects `..`, absolute paths,

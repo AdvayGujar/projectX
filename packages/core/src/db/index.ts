@@ -7,7 +7,7 @@ export type {
   UpdateDocumentInput,
 } from "./repositories/documents";
 export { createFileRepository } from "./repositories/files";
-export type { AddFileInput, FileRepository } from "./repositories/files";
+export type { AddFileInput, FileRepository, FileWithDocument } from "./repositories/files";
 export { migrate, migrations } from "./migrations";
 export { createMessageRepository } from "./repositories/messages";
 export type {

@@ -18,6 +18,9 @@ export interface FileStoragePort {
     relativePath: string,
     options?: FileStorageOptions,
   ): Promise<CopiedFile>;
-  /** Removes a sandbox file. A missing file is not an error. */
-  remove(relativePath: string, options?: FileStorageOptions): Promise<void>;
+  /**
+   * Removes a sandbox file. A missing file is not an error. Cleanup deliberately takes no
+   * signal: rollback must run even when the import was aborted.
+   */
+  remove(relativePath: string): Promise<void>;
 }
