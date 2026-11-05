@@ -173,8 +173,10 @@ the import graph; it fails CI if a deep import appears.
 
 ## Conventions worth repeating
 
-- Imported files and generated artifacts are session-owned. Projects aggregate them by joining
-  through `sessions`; neither table carries a `project_id`.
+- Optimize only after measuring a release build. Native code must clear a 30% improvement on a
+  hot path and keep the plan's budgets; otherwise keep the simpler JS or platform path.
+- Imported files are session-owned for standalone chats and project-owned for project chats;
+  generated artifacts keep a project home. Projects aggregate through both.
 - One public entry per module: `index.ts`.
 - Discriminated unions over boolean flags; `readonly` on anything crossing a boundary.
 - `unknown` + Zod at every external boundary (provider responses, DB JSON, file contents).
