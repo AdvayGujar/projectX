@@ -64,6 +64,16 @@ export function readSheetTool(ctx: DbContext): ToolDefinition {
 
       const all = await chunks.listByDocument(document.id);
       throwIfAborted(context.signal);
+      const sheets = availableSheets(all);
+      if (value.sheet !== undefined && !sheets.includes(value.sheet)) {
+        return {
+          content: sheets.length > 0
+            ? `Sheet "${value.sheet}" was not found. Available sheets: ${sheets.join(", ")}.`
+            : `Sheet "${value.sheet}" was not found in ${listing.file.name}.`,
+          display: `${listing.file.name} · sheet not found`,
+          isError: true,
+        };
+      }
       const selected = selectRows(all, listing, value.sheet, wanted);
       if (selected.length === 0) {
         return {
@@ -78,6 +88,17 @@ export function readSheetTool(ctx: DbContext): ToolDefinition {
       };
     },
   });
+}
+
+function availableSheets(chunks: readonly DocChunk[]): string[] {
+  const sheets = new Set<string>();
+  for (const chunk of chunks) {
+    const parsed = parseChunkRange(chunk.section);
+    if (parsed) {
+      sheets.add(parsed.sheet);
+    }
+  }
+  return [...sheets];
 }
 
 function selectRows(

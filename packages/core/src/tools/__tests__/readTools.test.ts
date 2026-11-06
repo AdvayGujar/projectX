@@ -232,6 +232,26 @@ describe("read tools", () => {
     expect(result.display).toBe("budget.xlsx · Budget!A2:B5");
   }));
 
+  it("names the available sheets when the model guesses wrong", () => withContext(async (ctx) => {
+    const session = await createSessionRepository(ctx).create({});
+    await seedFile(ctx, {
+      id: "budget",
+      sessionId: session.id,
+      name: "budget.xlsx",
+      kind: "xlsx",
+      sheetCount: 1,
+      chunks: [chunk(1, 1, "Budget!A1:C3", "Item\tAmount")],
+    });
+
+    const result = await run(ctx, session.id, "read_sheet", {
+      fileId: "budget",
+      sheet: "Sheet1",
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content).toContain('Available sheets: Budget');
+  }));
+
   it("searches only the chat and project scope", () => withContext(async (ctx) => {
     const projects = createProjectRepository(ctx);
     const sessions = createSessionRepository(ctx);
