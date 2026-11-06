@@ -33,7 +33,7 @@ apps/mobile/
   src/
     db/client.ts                one op-sqlite connection, migrations first
     navigation/                 drawer content, openDrawer
-    services/                   providerService · sessionQueries · turnService · keyStore · fileStorage · pdfExtractor
+    services/                   providerService · sessionQueries · turnService · keyStore · fileStorage · pdfExtractor · searchService
     state/                      modelStore · sessionStore · sessionsStore · useModelCatalog
     screens/                    shared screen scaffolding
     spike/                      throwaway M0 checks
@@ -183,6 +183,31 @@ component and the screen that composes it.
 6. Page-level jumps (`p.12`, `Slide 4`, `Sheet1!B2`) wait for citations in M3.
    `File.preview()` always opens at the start of the document, and neither platform exposes a
    page offset.
+
+### Search the workspace from the drawer
+
+1. `apps/mobile/src/services/searchService.ts` is the only drawer search entry point.
+   `searchWorkspace(query)` returns no groups when `toFtsQuery` finds no terms, then runs
+   `search.messages` and `search.chunks` in parallel with `limit: 20` through `getDbContext`.
+2. `groupSearchHits(messages, chunks)` is pure and testable without a database. Message hits
+   group by session (`title = sessionTitle`, `subtitle = projectName ?? "Chat"`); chunk hits
+   group by file (`title = sourceTitle ?? fileName`, `subtitle = projectName ?? "File"`,
+   `meta = page ? "p.<n>" : "Summary"`). The two hit lists are interleaved so chat matches
+   cannot starve document results; relevance order is preserved within each, capped at 8 groups
+   and 4 snippets per group.
+3. `DrawerShell` debounces the field by 250 ms, clears results below two characters, and drops
+   stale responses with a request id. `DrawerContent` swaps Recents for `DrawerSearchResults`
+   whenever the query is non-empty; the field, destinations and account row stay in place.
+4. FTS snippets mark matches with `[` and `]`; `DrawerSearchResults` splits on those markers so
+   only the term is emphasised.
+5. A message result closes the drawer and pushes `/session/[id]` with `focus: messageId`. The
+   session screen passes `focus` to `SessionBody`; `Transcript` reports each row's `y` through
+   `onTurnLayout`, and `SessionBody` scrolls to that row once. While the focus scroll is
+   pending the content-size handler does not scroll to the end; once it fires, normal streaming
+   resumes scrolling to the end.
+6. A chunk result uses `Linking.openURL(sourceUrl)` for a project link summary and
+   `openFileById(fileId)` for a stored file. Failures leave the drawer open and print the
+   error inline through the same search error slot.
 
 ### Add a provider
 

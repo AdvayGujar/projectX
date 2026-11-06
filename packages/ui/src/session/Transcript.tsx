@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 import { useState } from "react";
+import type { LayoutChangeEvent } from "react-native";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Icon } from "../icons";
@@ -16,6 +17,8 @@ export interface TranscriptProps {
   readonly onOpenAttachment: (turnId: string, attachment: TurnAttachment) => void;
   readonly onReadAloud: (turnId: string) => void;
   readonly onOpenSources: (turnId: string) => void;
+  /** Reports each row's offset so a search result can scroll the transcript to it. */
+  readonly onTurnLayout?: (turnId: string, y: number) => void;
 }
 
 const DISCLAIMER = "AI can make mistakes. Check generated files before sharing.";
@@ -27,14 +30,22 @@ export function Transcript({
   onOpenAttachment,
   onReadAloud,
   onOpenSources,
+  onTurnLayout,
 }: TranscriptProps): ReactElement {
   const [openThoughtId, setOpenThoughtId] = useState<string | null>(null);
+
+  function layoutHandler(turnId: string): ((event: LayoutChangeEvent) => void) | undefined {
+    if (!onTurnLayout) {
+      return undefined;
+    }
+    return (event) => onTurnLayout(turnId, event.nativeEvent.layout.y);
+  }
 
   return (
     <View style={styles.root}>
       {turns.map((turn) =>
         turn.role === "user" ? (
-          <View key={turn.id} style={styles.userRow}>
+          <View key={turn.id} style={styles.userRow} onLayout={layoutHandler(turn.id)}>
             {turn.text.length > 0 ? <Text style={styles.userText}>{turn.text}</Text> : null}
             {turn.attachments && turn.attachments.length > 0 ? (
               <View style={styles.userAttachments}>
@@ -61,7 +72,7 @@ export function Transcript({
             ) : null}
           </View>
         ) : (
-          <View key={turn.id} style={styles.assistantRow}>
+          <View key={turn.id} style={styles.assistantRow} onLayout={layoutHandler(turn.id)}>
             {turn.reasoningRequested !== false && turn.reasoning ? (
               <Thought
                 summary={summarise(turn)}

@@ -35,7 +35,7 @@ import { useModelStore } from "../../src/state/modelStore";
 import { useSessionStore } from "../../src/state/sessionStore";
 
 export default function SessionScreen(): ReactElement {
-  const params = useLocalSearchParams<{ id: string }>();
+  const params = useLocalSearchParams<{ id: string; focus?: string }>();
   const sessionId = params.id ?? "";
   const openDrawer = useOpenDrawer();
 
@@ -315,6 +315,7 @@ export default function SessionScreen(): ReactElement {
         turns={turns}
         error={error}
         streaming={streaming}
+        focusTurnId={params.focus ?? null}
         onCopy={(turnId) => {
           void copyTurn(turnId);
         }}

@@ -7,6 +7,14 @@ export type { ComposerNoticeProps } from "./composer/ComposerNotice";
 export { DrawerContent } from "./drawer/DrawerContent";
 export type { DrawerContentProps } from "./drawer/DrawerContent";
 
+export { DrawerSearchResults, splitSnippet } from "./drawer/DrawerSearchResults";
+export type {
+  DrawerSearchGroup,
+  DrawerSearchItem,
+  DrawerSearchKind,
+  DrawerSearchResultsProps,
+} from "./drawer/DrawerSearchResults";
+
 export { EmptyState } from "./empty/EmptyState";
 export type { EmptyAction, EmptyStateProps } from "./empty/EmptyState";
 

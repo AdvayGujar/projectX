@@ -6,21 +6,29 @@ export interface SearchOptions {
 }
 
 export interface MessageSearchHit {
-  partId: string;
-  messageId: string;
-  sessionId: string;
-  snippet: string;
-  rank: number;
+  readonly partId: string;
+  readonly messageId: string;
+  readonly sessionId: string;
+  readonly sessionTitle: string;
+  readonly projectId: string | null;
+  readonly projectName: string | null;
+  readonly snippet: string;
+  readonly rank: number;
 }
 
 export interface ChunkSearchHit {
-  chunkId: string;
-  documentId: string;
-  fileId: string;
-  page: number | null;
-  section: string | null;
-  snippet: string;
-  rank: number;
+  readonly chunkId: string;
+  readonly documentId: string;
+  readonly fileId: string;
+  readonly fileName: string;
+  readonly projectId: string | null;
+  readonly projectName: string | null;
+  readonly sourceUrl: string | null;
+  readonly sourceTitle: string | null;
+  readonly page: number | null;
+  readonly section: string | null;
+  readonly snippet: string;
+  readonly rank: number;
 }
 
 /** A chunk ready to become model context: text plus the citation its header needs. */
@@ -64,13 +72,15 @@ export function createSearchRepository({ db }: DbContext) {
       }
       const { filter, params } = buildFilter(options.projectId, "s.project_id");
       const result = await db.execute(
-        `SELECT p.id AS part_id, p.message_id, m.session_id,
+        `SELECT p.id AS part_id, p.message_id, m.session_id, s.title AS session_title,
+                s.project_id, pr.name AS project_name,
                 snippet(parts_fts, 0, '[', ']', '…', 12) AS snippet,
                 bm25(parts_fts) AS rank
          FROM parts_fts
          JOIN parts p ON p.rowid = parts_fts.rowid
          JOIN messages m ON m.id = p.message_id
          JOIN sessions s ON s.id = m.session_id
+         LEFT JOIN projects pr ON pr.id = s.project_id
          WHERE parts_fts MATCH ?${filter}
          ORDER BY rank
          LIMIT ?`,
@@ -80,6 +90,9 @@ export function createSearchRepository({ db }: DbContext) {
         partId: String(row.part_id),
         messageId: String(row.message_id),
         sessionId: String(row.session_id),
+        sessionTitle: String(row.session_title ?? ""),
+        projectId: nullableString(row.project_id),
+        projectName: nullableString(row.project_name),
         snippet: String(row.snippet ?? ""),
         rank: Number(row.rank ?? 0),
       }));
@@ -93,6 +106,15 @@ export function createSearchRepository({ db }: DbContext) {
       const { filter, params } = buildChunkFilter(options.projectId);
       const result = await db.execute(
         `SELECT c.id AS chunk_id, c.document_id, d.file_id, c.page, c.section,
+                f.name AS file_name,
+                COALESCE(f.project_id, s.project_id) AS project_id,
+                pr.name AS project_name,
+                (SELECT l.url FROM project_links l
+                 WHERE l.snapshot_file_id = f.id
+                 ORDER BY l.created_at DESC LIMIT 1) AS source_url,
+                (SELECT l.title FROM project_links l
+                 WHERE l.snapshot_file_id = f.id
+                 ORDER BY l.created_at DESC LIMIT 1) AS source_title,
                 snippet(doc_chunks_fts, 0, '[', ']', '…', 12) AS snippet,
                 bm25(doc_chunks_fts) AS rank
          FROM doc_chunks_fts
@@ -100,6 +122,7 @@ export function createSearchRepository({ db }: DbContext) {
          JOIN documents d ON d.id = c.document_id
          JOIN files f ON f.id = d.file_id
          LEFT JOIN sessions s ON s.id = f.session_id
+         LEFT JOIN projects pr ON pr.id = COALESCE(f.project_id, s.project_id)
          WHERE doc_chunks_fts MATCH ? AND d.status = 'ready'${filter}
          ORDER BY rank
          LIMIT ?`,
@@ -109,6 +132,11 @@ export function createSearchRepository({ db }: DbContext) {
         chunkId: String(row.chunk_id),
         documentId: String(row.document_id),
         fileId: String(row.file_id),
+        fileName: String(row.file_name ?? ""),
+        projectId: nullableString(row.project_id),
+        projectName: nullableString(row.project_name),
+        sourceUrl: nullableString(row.source_url),
+        sourceTitle: nullableString(row.source_title),
         page: row.page === null ? null : Number(row.page),
         section: row.section === null ? null : String(row.section),
         snippet: String(row.snippet ?? ""),
@@ -248,4 +276,8 @@ function buildChunkFilter(projectId: string | null | undefined): { filter: strin
 
 function limitOf(options: SearchOptions): number {
   return Math.max(1, Math.min(options.limit ?? 20, 50));
+}
+
+function nullableString(value: SqlValue | undefined): string | null {
+  return value === null || value === undefined ? null : String(value);
 }
