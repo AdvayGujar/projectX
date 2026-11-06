@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { createChunkRepository, createDocumentRepository } from "../db";
 import type { ContextChunk, DbContext, DocChunk, FileListing } from "../db";
+import { citationsFromChunks } from "./citations";
 import { defineTool } from "./executor";
 import { formatChunk, plural } from "./format";
 import { requireFile, resolveToolScope, throwIfAborted } from "./scope";
@@ -85,6 +86,7 @@ export function readSheetTool(ctx: DbContext): ToolDefinition {
       return {
         content: selected.map(formatChunk).join("\n\n"),
         display: displayOf(listing, value.sheet, value.range, selected, document.sheetCount),
+        citations: citationsFromChunks(selected),
       };
     },
   });

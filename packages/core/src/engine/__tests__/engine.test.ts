@@ -13,7 +13,7 @@ import {
   type ProviderRuntime,
 } from "../../providers";
 import { createTurnEngine } from "../runner";
-import type { ToolCall, ToolExecutor, TurnEvent } from "../types";
+import type { CitationRef, ToolCall, ToolExecutor, TurnEvent } from "../types";
 
 function fixtureModel(): ModelInfo {
   const model = knownModels("deepseek")[0];
@@ -48,7 +48,10 @@ function scripted(scripts: ProviderEvent[][]): { adapter: ProviderAdapter; reque
   return { adapter, requests };
 }
 
-function toolExecutor(content = "ok"): { tools: ToolExecutor; calls: ToolCall[] } {
+function toolExecutor(
+  content = "ok",
+  citations?: readonly CitationRef[],
+): { tools: ToolExecutor; calls: ToolCall[] } {
   const calls: ToolCall[] = [];
   return {
     calls,
@@ -57,7 +60,13 @@ function toolExecutor(content = "ok"): { tools: ToolExecutor; calls: ToolCall[] 
       roleOf: () => "read",
       async execute(call) {
         calls.push(call);
-        return { toolCallId: call.id, name: call.name, content, display: "document" };
+        return {
+          toolCallId: call.id,
+          name: call.name,
+          content,
+          display: "document",
+          ...(citations ? { citations } : {}),
+        };
       },
     },
   };
@@ -276,7 +285,14 @@ describe("turn engine", () => {
         { type: "done", stopReason: "stop" },
       ],
     ]);
-    const tool = toolExecutor("page 1");
+    const citation: CitationRef = {
+      fileId: "f1",
+      fileName: "report.pdf",
+      fileKind: "pdf",
+      page: 1,
+      section: null,
+    };
+    const tool = toolExecutor("page 1", [citation]);
     const events: TurnEvent[] = [];
     const engine = createTurnEngine({ db: ctx, adapter, tools: tool.tools });
 
@@ -299,7 +315,7 @@ describe("turn engine", () => {
       type: "tool_result",
       role: "read",
       assistantMessageId: history[1]?.id,
-      result: { display: "document" },
+      result: { display: "document", citations: [citation] },
     });
   }));
 

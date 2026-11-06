@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { createSearchRepository } from "../db";
 import type { DbContext } from "../db";
+import { citationsFromChunks } from "./citations";
 import { defineTool } from "./executor";
 import { formatChunk, plural } from "./format";
 import { resolveToolScope, throwIfAborted } from "./scope";
@@ -48,6 +49,7 @@ export function searchDocumentsTool(ctx: DbContext): ToolDefinition {
       return {
         content: hits.map(formatChunk).join("\n\n"),
         display: `"${value.query}" · ${plural(hits.length, "match", "matches")}`,
+        citations: citationsFromChunks(hits),
       };
     },
   });

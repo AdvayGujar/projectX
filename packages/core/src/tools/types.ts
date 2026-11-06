@@ -1,5 +1,6 @@
 import type { z } from "zod";
 
+import type { FileKind } from "../db";
 import type { ToolSchema } from "../providers";
 
 /** Whether a tool only reads data or changes it. The Thought disclosure renders this. */
@@ -21,6 +22,7 @@ export interface ToolResult {
   isError?: boolean;
   display?: string;
   role?: ToolRole;
+  citations?: readonly CitationRef[];
 }
 
 export interface ToolExecutionContext {
@@ -28,11 +30,21 @@ export interface ToolExecutionContext {
   signal?: AbortSignal;
 }
 
+/** A page, slide, or section the model actually read. */
+export interface CitationRef {
+  readonly fileId: string;
+  readonly fileName: string;
+  readonly fileKind: FileKind;
+  readonly page: number | null;
+  readonly section: string | null;
+}
+
 /** What a tool returns before the executor adds the call id and role. */
 export interface ToolOutcome {
   content: string;
   display: string;
   isError?: boolean;
+  citations?: readonly CitationRef[];
 }
 
 /** A registered tool: schema, role, and a typed execute function. */

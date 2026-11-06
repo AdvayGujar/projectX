@@ -5,6 +5,7 @@ export { createTurnEngine } from "./runner";
 export type { TurnEngine } from "./runner";
 export type {
   AssistantOutcome,
+  CitationRef,
   BuiltContext,
   ContextOptions,
   EngineDeps,
