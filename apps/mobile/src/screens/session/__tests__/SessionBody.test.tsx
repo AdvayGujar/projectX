@@ -147,6 +147,23 @@ describe("SessionBody", () => {
     expect(screen.queryByText("Thinking…")).toBeNull();
   });
 
+  it("shows tool activity without reasoning", async () => {
+    await renderBody([
+      {
+        id: "a1",
+        role: "assistant",
+        text: "The report grew.",
+        status: "done",
+        reasoningRequested: false,
+        activity: [
+          { kind: "read", tool: "read_document", detail: "report.pdf · 2 pages" },
+        ],
+      },
+    ]);
+
+    expect(screen.getByText("Thought · 1 tool · 1 document read")).toBeTruthy();
+  });
+
   it("calls back when regenerate is pressed", async () => {
     const onRegenerate = jest.fn();
     await render(

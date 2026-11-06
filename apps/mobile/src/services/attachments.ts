@@ -10,7 +10,7 @@ export interface ImageAttachment {
 }
 
 export interface AttachmentRules {
-  /** Project chats attach documents through the library; other chats cannot read them. */
+  /** A session screen enables this once it exists; the new-chat screen has no chat to own a file. */
   readonly documentsAllowed?: boolean;
 }
 
@@ -21,7 +21,7 @@ export interface AttachmentRules {
  */
 export function attachmentProblem(
   attachments: readonly AttachmentChip[],
-  model: Pick<ModelOption, "label" | "vision"> | null,
+  model: Pick<ModelOption, "label" | "vision" | "tools"> | null,
   rules: AttachmentRules = {},
 ): string | null {
   if (attachments.length === 0) {
@@ -30,6 +30,9 @@ export function attachmentProblem(
   const hasDocument = attachments.some((attachment) => attachment.kind === "document");
   if (hasDocument && !rules.documentsAllowed) {
     return "Documents belong to a project. Move this chat into a project or remove the file.";
+  }
+  if (hasDocument && !model?.tools) {
+    return `${model?.label ?? "The selected model"} cannot read documents. Choose a model with tool support or remove the file.`;
   }
   const images = attachments.filter((attachment) => attachment.kind === "image");
   if (images.length > 0 && !model?.vision) {

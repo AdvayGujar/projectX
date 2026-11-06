@@ -1,4 +1,4 @@
-import type { TurnCost, ViewTurn } from "@projectx/ui";
+import type { ToolActivity, TurnCost, ViewTurn } from "@projectx/ui";
 import { create } from "zustand";
 
 export interface SessionUsage {
@@ -38,7 +38,9 @@ interface SessionState {
   }) => void;
   readonly appendText: (id: string, text: string) => void;
   readonly appendReasoning: (id: string, text: string) => void;
+  readonly addActivity: (id: string, activity: ToolActivity) => void;
   readonly setCost: (id: string, cost: TurnCost) => void;
+  readonly adoptTurnId: (fromId: string, toId: string) => void;
   readonly settleStreaming: () => void;
   readonly setStreaming: (value: boolean) => void;
   readonly setError: (message: string | null) => void;
@@ -97,8 +99,21 @@ export const useSessionStore = create<SessionState>((set) => ({
       })),
     })),
 
+  addActivity: (id, activity) =>
+    set((state) => ({
+      turns: update(state.turns, id, (turn) => ({
+        ...turn,
+        activity: [...(turn.activity ?? []), activity],
+      })),
+    })),
+
   setCost: (id, cost) =>
     set((state) => ({ turns: update(state.turns, id, (turn) => ({ ...turn, cost })) })),
+
+  adoptTurnId: (fromId, toId) =>
+    set((state) => ({
+      turns: state.turns.map((turn) => (turn.id === fromId ? { ...turn, id: toId } : turn)),
+    })),
 
   settleStreaming: () =>
     set((state) => ({

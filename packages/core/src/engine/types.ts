@@ -8,38 +8,36 @@ import type {
   ProviderRuntime,
   ToolSchema,
 } from "../providers";
+import type {
+  ToolCall,
+  ToolExecutor,
+  ToolResult,
+  ToolRole,
+} from "../tools";
 
-export interface ToolCall {
-  id: string;
-  name: string;
-  arguments: unknown;
-}
+export type {
+  ToolCall,
+  ToolExecutionContext,
+  ToolExecutor,
+  ToolResult,
+  ToolRole,
+} from "../tools";
 
-export interface ToolResult {
-  toolCallId: string;
-  name: string;
-  content: string;
-  isError?: boolean;
-}
-
-export interface ToolExecutionContext {
-  sessionId: string;
-  signal?: AbortSignal;
-}
-
-export interface ToolExecutor {
-  execute(call: ToolCall, context: ToolExecutionContext): Promise<ToolResult>;
-}
-
-export type TurnStatus = "done" | "aborted" | "error" | "max_steps";
+export type TurnStatus = "done" | "aborted" | "error" | "max_steps" | "repeated_tool";
 
 export type TurnEvent =
   | { type: "turn_started"; sessionId: string; userMessageId: string | null }
-  | { type: "message_started"; messageId: string }
+  | { type: "message_started"; messageId: string; step: number }
   | { type: "text_delta"; messageId: string; text: string }
   | { type: "reasoning_delta"; messageId: string; text: string }
   | { type: "tool_call"; messageId: string; call: ToolCall }
-  | { type: "tool_result"; messageId: string; result: ToolResult }
+  | {
+    type: "tool_result";
+    messageId: string;
+    assistantMessageId: string;
+    role: ToolRole;
+    result: ToolResult;
+  }
   | { type: "usage"; messageId: string; usage: Usage }
   | { type: "turn_finished"; status: TurnStatus; messageId: string | null }
   | { type: "error"; code: AppErrorCode; message: string; retryable: boolean };
@@ -50,7 +48,7 @@ export interface RunTurnOptions {
   provider: ProviderRuntime;
   system: string;
   userParts: PartInput[];
-  tools?: ToolSchema[];
+  tools?: readonly ToolSchema[];
   maxOutputTokens: number;
   temperature?: number;
   maxSteps?: number;

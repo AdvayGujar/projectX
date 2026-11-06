@@ -38,7 +38,7 @@ describe("composeSystemPrompt", () => {
       [
         "Project instructions:\nKeep answers short.",
         "Project library:\n[File: brief.pdf]\nRevenue grew.",
-        "Project artifacts:\n- Deck: Q3 Review (v3)\n- Sheet: Forecast (v1)",
+        "Project artifacts:\n- Deck: Q3 Review (v3, id a1)\n- Sheet: Forecast (v1, id a2)",
       ].join("\n\n"),
     );
   });

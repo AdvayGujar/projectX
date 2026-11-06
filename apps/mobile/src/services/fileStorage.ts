@@ -20,6 +20,22 @@ export function createAppFileStorage(): FileStoragePort {
       return { size: destination.exists ? destination.size : null };
     },
 
+    async readBytes(relativePath, options) {
+      throwIfAborted(options);
+      const file = existingFile(relativePath);
+      const bytes = await file.bytes();
+      throwIfAborted(options);
+      return bytes;
+    },
+
+    async readText(relativePath, options) {
+      throwIfAborted(options);
+      const file = existingFile(relativePath);
+      const text = await file.text();
+      throwIfAborted(options);
+      return text;
+    },
+
     async writeText(relativePath, text) {
       const file = new File(joinUnderRoot(DOCUMENTS_ROOT, relativePath));
       file.parentDirectory.create({ intermediates: true, idempotent: true });
@@ -46,6 +62,16 @@ export function createAppFileStorage(): FileStoragePort {
       }
     },
   };
+}
+
+function existingFile(relativePath: string): File {
+  const file = new File(joinUnderRoot(DOCUMENTS_ROOT, relativePath));
+  if (!file.exists) {
+    throw new AppError("file_not_found", `Stored file is missing: ${relativePath}`, {
+      userMessage: "That file is missing from the app.",
+    });
+  }
+  return file;
 }
 
 function throwIfAborted(options: FileStorageOptions | undefined): void {

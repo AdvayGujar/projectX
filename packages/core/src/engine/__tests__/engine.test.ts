@@ -53,15 +53,19 @@ function toolExecutor(content = "ok"): { tools: ToolExecutor; calls: ToolCall[] 
   return {
     calls,
     tools: {
+      schemas: [{ name: "read_document", description: "Read a page", parameters: { type: "object" } }],
+      roleOf: () => "read",
       async execute(call) {
         calls.push(call);
-        return { toolCallId: call.id, name: call.name, content };
+        return { toolCallId: call.id, name: call.name, content, display: "document" };
       },
     },
   };
 }
 
 const noTools: ToolExecutor = {
+  schemas: [],
+  roleOf: () => undefined,
   async execute(call) {
     return { toolCallId: call.id, name: call.name, content: "unused" };
   },
@@ -234,17 +238,119 @@ describe("turn engine", () => {
     expect(events.some((event) => event.type === "error")).toBe(true);
   }));
 
+  it("uses the executor's schemas when a turn does not override them", () => withContext(async (ctx) => {
+    const sessions = createSessionRepository(ctx);
+    const session = await sessions.create({});
+    const { adapter, requests } = scripted([[
+      { type: "text_delta", text: "Hello" },
+      { type: "done", stopReason: "stop" },
+    ]]);
+    const tool = toolExecutor();
+    const engine = createTurnEngine({ db: ctx, adapter, tools: tool.tools });
+
+    await engine.runTurn({
+      sessionId: session.id,
+      model: fixtureModel(),
+      provider,
+      system: "",
+      userParts: [{ type: "text", data: { text: "Hi" } }],
+      maxOutputTokens: 100,
+    });
+
+    expect(requests[0]?.tools?.map((schema) => schema.name)).toEqual(["read_document"]);
+  }));
+
+  it("labels tool results for the transcript", () => withContext(async (ctx) => {
+    const sessions = createSessionRepository(ctx);
+    const messages = createMessageRepository(ctx);
+    const session = await sessions.create({});
+    const { adapter } = scripted([
+      [
+        { type: "tool_call_start", id: "c1", name: "read_document" },
+        { type: "tool_call_delta", id: "c1", argumentsJson: '{"page":1}' },
+        { type: "tool_call_end", id: "c1" },
+        { type: "done", stopReason: "tool_calls" },
+      ],
+      [
+        { type: "text_delta", text: "Finished" },
+        { type: "done", stopReason: "stop" },
+      ],
+    ]);
+    const tool = toolExecutor("page 1");
+    const events: TurnEvent[] = [];
+    const engine = createTurnEngine({ db: ctx, adapter, tools: tool.tools });
+
+    const result = await engine.runTurn({
+      sessionId: session.id,
+      model: fixtureModel(),
+      provider,
+      system: "",
+      userParts: [{ type: "text", data: { text: "Read" } }],
+      maxOutputTokens: 100,
+      onEvent: (event) => events.push(event),
+    });
+
+    const history = await messages.list(session.id);
+    const toolCall = history[1]?.parts.find((part) => part.type === "tool_call");
+    const toolResult = events.find((event) => event.type === "tool_result");
+    expect(result.status).toBe("done");
+    expect(toolCall?.data).toMatchObject({ name: "read_document", role: "read" });
+    expect(toolResult).toMatchObject({
+      type: "tool_result",
+      role: "read",
+      assistantMessageId: history[1]?.id,
+      result: { display: "document" },
+    });
+  }));
+
+  it("stops when the model repeats the same tool call", () => withContext(async (ctx) => {
+    const sessions = createSessionRepository(ctx);
+    const session = await sessions.create({});
+    const repeated: ProviderEvent[] = [
+      { type: "tool_call_start", id: "c1", name: "read_document" },
+      { type: "tool_call_delta", id: "c1", argumentsJson: '{"page":1}' },
+      { type: "tool_call_end", id: "c1" },
+      { type: "done", stopReason: "tool_calls" },
+    ];
+    const second: ProviderEvent[] = [
+      { type: "tool_call_start", id: "c2", name: "read_document" },
+      { type: "tool_call_delta", id: "c2", argumentsJson: '{"page":1}' },
+      { type: "tool_call_end", id: "c2" },
+      { type: "done", stopReason: "tool_calls" },
+    ];
+    const { adapter } = scripted([repeated, second, repeated]);
+    const tool = toolExecutor();
+    const events: TurnEvent[] = [];
+    const engine = createTurnEngine({ db: ctx, adapter, tools: tool.tools });
+
+    const result = await engine.runTurn({
+      sessionId: session.id,
+      model: fixtureModel(),
+      provider,
+      system: "",
+      userParts: [{ type: "text", data: { text: "Loop" } }],
+      maxOutputTokens: 100,
+      maxSteps: 3,
+      onEvent: (event) => events.push(event),
+    });
+
+    expect(result.status).toBe("repeated_tool");
+    expect(result.error?.userMessage).toContain("repeated the same tool call");
+    expect(tool.calls).toHaveLength(1);
+    expect(events.some((event) => event.type === "error")).toBe(true);
+  }));
+
   it("stops at the step limit", () => withContext(async (ctx) => {
     const sessions = createSessionRepository(ctx);
     const messages = createMessageRepository(ctx);
     const session = await sessions.create({});
-    const toolCall: ProviderEvent[] = [
-      { type: "tool_call_start", id: "c1", name: "read_document" },
-      { type: "tool_call_delta", id: "c1", argumentsJson: "{}" },
-      { type: "tool_call_end", id: "c1" },
+    const toolCall = (page: number): ProviderEvent[] => [
+      { type: "tool_call_start", id: `c${page}`, name: "read_document" },
+      { type: "tool_call_delta", id: `c${page}`, argumentsJson: `{"page":${page}}` },
+      { type: "tool_call_end", id: `c${page}` },
       { type: "done", stopReason: "tool_calls" },
     ];
-    const { adapter } = scripted([toolCall, toolCall, toolCall]);
+    const { adapter } = scripted([toolCall(1), toolCall(2), toolCall(3)]);
     const tool = toolExecutor();
     const engine = createTurnEngine({ db: ctx, adapter, tools: tool.tools });
 

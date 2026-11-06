@@ -36,6 +36,12 @@ function createStorage(): FakeStorage {
     async copyFromUri() {
       throw new Error("the link importer must not copy picker files");
     },
+    async readBytes() {
+      throw new Error("the link importer must not read stored bytes");
+    },
+    async readText() {
+      throw new Error("the link importer must not read stored text");
+    },
     async writeText(relativePath, text) {
       written.set(relativePath, text);
       return { size: text.length };

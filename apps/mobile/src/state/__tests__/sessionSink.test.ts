@@ -38,4 +38,39 @@ describe("session sink", () => {
 
     expect(store().streaming).toBe(false);
   });
+
+  it("keeps a multi-step turn on one row and adopts the final message id", () => {
+    sink.onUserTurn("user-1", "read the report");
+    sink.onAssistantStart("assistant-1", true, 1);
+    sink.onToolActivity("assistant-1", {
+      kind: "read",
+      tool: "read_document",
+      detail: "report.pdf · 2 pages",
+    });
+    sink.onAssistantStart("assistant-2", true, 2);
+    sink.onText("assistant-2", "The report grew.");
+    sink.onUsage("assistant-1", {
+      model: "Model",
+      effort: "High",
+      inputTokens: 10,
+      outputTokens: 2,
+      costUsd: 0.01,
+    });
+    sink.onUsage("assistant-2", {
+      model: "Model",
+      effort: "High",
+      inputTokens: 20,
+      outputTokens: 4,
+      costUsd: 0.02,
+    });
+    sink.onTurnFinished("assistant-2");
+
+    const assistant = store().turns.find((turn) => turn.role === "assistant");
+    expect(store().turns).toHaveLength(2);
+    expect(assistant?.id).toBe("assistant-2");
+    expect(assistant?.text).toBe("The report grew.");
+    expect(assistant?.activity).toHaveLength(1);
+    expect(assistant?.cost?.tokens).toBe("30 in / 6 out");
+    expect(assistant?.cost?.usd).toBe("$0.0300");
+  });
 });

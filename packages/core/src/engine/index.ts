@@ -13,6 +13,7 @@ export type {
   ToolExecutionContext,
   ToolExecutor,
   ToolResult,
+  ToolRole,
   TurnEvent,
   TurnResult,
   TurnStatus,

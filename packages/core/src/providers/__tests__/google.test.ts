@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createGoogleAdapter } from "../google";
-import { toGoogleContents } from "../googleMessages";
+import { toGoogleContents, toGoogleTools } from "../googleMessages";
 import { knownModels } from "../registry";
 import type { FetchInit, FetchLike, ModelInfo } from "../types";
 import { collect, data, requestFor, runtimeFor, sseResponse } from "./helpers";
@@ -39,6 +39,36 @@ describe("google contents conversion", () => {
     expect(result.contents[2]?.parts[0]).toMatchObject({
       functionResponse: { name: "read_document", response: { content: "page one" } },
     });
+  });
+
+  it("strips JSON Schema keywords Gemini does not accept", () => {
+    const tools = toGoogleTools([{
+      name: "read_document",
+      description: "Read a file.",
+      parameters: {
+        $schema: "https://json-schema.org/draft/2020-12/schema",
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          fileId: { type: "string", minLength: 1, description: "The id." },
+        },
+        required: ["fileId"],
+      },
+    }]);
+
+    expect(tools).toEqual([{
+      functionDeclarations: [{
+        name: "read_document",
+        description: "Read a file.",
+        parameters: {
+          type: "object",
+          properties: {
+            fileId: { type: "string", minLength: 1, description: "The id." },
+          },
+          required: ["fileId"],
+        },
+      }],
+    }]);
   });
 });
 

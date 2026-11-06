@@ -1,4 +1,4 @@
-import type { ModelPricing, RegenerationTarget } from "@projectx/core";
+import type { ModelPricing, RegenerationTarget, ToolRole } from "@projectx/core";
 import {
   createMessageRepository,
   createProviderRepository,
@@ -6,7 +6,7 @@ import {
   prepareRegeneration as prepareRegenerationInDatabase,
 } from "@projectx/core";
 import type { MessageWithParts, Part } from "@projectx/core";
-import type { TurnAttachment, TurnCost, ViewTurn } from "@projectx/ui";
+import type { ToolActivity, TurnAttachment, TurnCost, ViewTurn } from "@projectx/ui";
 
 import { getDbContext } from "../db/client";
 import { createAppFileStorage } from "./fileStorage";
@@ -159,9 +159,195 @@ export async function loadSession(sessionId: string): Promise<LoadedSession | nu
     title: session.title,
     pinned: session.pinned,
     projectId: session.projectId,
-    turns: messages.map((message) => toTurn(message, prices)).filter(isTurn),
+    turns: toTurns(messages, prices),
     totals: totalsOf(messages, prices),
   };
+}
+
+interface StoredToolResult {
+  readonly name: string;
+  readonly role: ToolRole;
+  readonly detail: string;
+}
+
+interface StoredToolCall {
+  readonly id: string;
+  readonly name: string;
+  readonly role: ToolRole;
+}
+
+/** A tool-using turn is several assistant messages; the transcript shows one row. */
+function toTurns(
+  messages: readonly MessageWithParts[],
+  prices: Map<string, PriceEntry>,
+): ViewTurn[] {
+  const visible = messages.filter((message) => !message.superseded);
+  const results = collectToolResults(visible);
+  const turns: ViewTurn[] = [];
+  let index = 0;
+
+  while (index < visible.length) {
+    const message = visible[index];
+    if (!message) {
+      break;
+    }
+    if (message.role === "user") {
+      const turn = userTurn(message);
+      if (turn) {
+        turns.push(turn);
+      }
+      index += 1;
+      continue;
+    }
+    if (message.role !== "assistant") {
+      index += 1;
+      continue;
+    }
+    const run: MessageWithParts[] = [];
+    while (index < visible.length) {
+      const current = visible[index];
+      if (!current || current.role === "user" || current.role === "system") {
+        break;
+      }
+      if (current.role === "assistant") {
+        run.push(current);
+      }
+      index += 1;
+    }
+    const turn = assistantTurn(run, results, prices);
+    if (turn) {
+      turns.push(turn);
+    }
+  }
+
+  return turns;
+}
+
+function userTurn(message: MessageWithParts): ViewTurn | null {
+  const text = joinParts(message.parts, "text");
+  const attachments = attachmentsOf(message.parts);
+  if (text.length === 0 && attachments.length === 0) {
+    return null;
+  }
+  return {
+    id: message.id,
+    role: "user",
+    text,
+    ...(attachments.length > 0 ? { attachments } : {}),
+  };
+}
+
+function assistantTurn(
+  run: readonly MessageWithParts[],
+  results: ReadonlyMap<string, StoredToolResult>,
+  prices: Map<string, PriceEntry>,
+): ViewTurn | null {
+  const last = run.at(-1);
+  if (!last) {
+    return null;
+  }
+  const text = run.map((message) => joinParts(message.parts, "text")).filter(Boolean).join("\n\n");
+  const reasoning = run
+    .map((message) => joinParts(message.parts, "reasoning"))
+    .filter(Boolean)
+    .join("\n\n");
+  const activity = activityOf(run, results);
+  const cost = costOfRun(run, prices);
+
+  return {
+    id: last.id,
+    role: "assistant",
+    text,
+    ...(reasoning.length > 0 ? { reasoning } : {}),
+    ...(activity.length > 0 ? { activity } : {}),
+    ...(cost ? { cost } : {}),
+  };
+}
+
+function activityOf(
+  run: readonly MessageWithParts[],
+  results: ReadonlyMap<string, StoredToolResult>,
+): ToolActivity[] {
+  const activity: ToolActivity[] = [];
+  for (const message of run) {
+    for (const part of message.parts) {
+      if (part.type !== "tool_call") {
+        continue;
+      }
+      const call = storedToolCall(part);
+      const result = call ? results.get(call.id) : undefined;
+      if (!call || !result) {
+        continue;
+      }
+      activity.push({
+        kind: result.role === "write" ? "wrote" : "read",
+        tool: call.name,
+        detail: result.detail,
+      });
+    }
+  }
+  return activity;
+}
+
+function collectToolResults(
+  messages: readonly MessageWithParts[],
+): Map<string, StoredToolResult> {
+  const results = new Map<string, StoredToolResult>();
+  for (const message of messages) {
+    if (message.role !== "tool") {
+      continue;
+    }
+    for (const part of message.parts) {
+      if (part.type !== "tool_result") {
+        continue;
+      }
+      const result = storedToolResult(part);
+      if (result) {
+        results.set(result.toolCallId, result);
+      }
+    }
+  }
+  return results;
+}
+
+function storedToolCall(part: Part): StoredToolCall | null {
+  const data = part.data;
+  if (typeof data !== "object" || data === null) {
+    return null;
+  }
+  const value = data as { id?: unknown; name?: unknown; role?: unknown };
+  if (typeof value.id !== "string" || typeof value.name !== "string") {
+    return null;
+  }
+  return { id: value.id, name: value.name, role: toRole(value.role) };
+}
+
+function storedToolResult(
+  part: Part,
+): (StoredToolResult & { readonly toolCallId: string }) | null {
+  const data = part.data;
+  if (typeof data !== "object" || data === null) {
+    return null;
+  }
+  const value = data as {
+    toolCallId?: unknown;
+    name?: unknown;
+    role?: unknown;
+    display?: unknown;
+  };
+  if (typeof value.toolCallId !== "string" || typeof value.name !== "string") {
+    return null;
+  }
+  return {
+    toolCallId: value.toolCallId,
+    name: value.name,
+    role: toRole(value.role),
+    detail: typeof value.display === "string" ? value.display : value.name,
+  };
+}
+
+function toRole(value: unknown): ToolRole {
+  return value === "write" ? "write" : "read";
 }
 
 function totalsOf(messages: readonly MessageWithParts[], prices: Map<string, PriceEntry>): SessionTotals {
@@ -197,41 +383,6 @@ function numericCost(message: MessageWithParts, prices: Map<string, PriceEntry>)
     return null;
   }
   return perMillion(message.inputTokens ?? 0, message.outputTokens ?? 0, pricing);
-}
-
-function toTurn(message: MessageWithParts, prices: Map<string, PriceEntry>): ViewTurn | null {
-  if (message.superseded) {
-    return null;
-  }
-  const text = joinParts(message.parts, "text");
-  if (message.role === "user") {
-    const attachments = attachmentsOf(message.parts);
-    if (text.length === 0 && attachments.length === 0) {
-      return null;
-    }
-    return {
-      id: message.id,
-      role: "user",
-      text,
-      ...(attachments.length > 0 ? { attachments } : {}),
-    };
-  }
-  if (message.role !== "assistant") {
-    return null;
-  }
-  const reasoning = joinParts(message.parts, "reasoning");
-  const turn: ViewTurn = {
-    id: message.id,
-    role: "assistant",
-    text,
-    ...(reasoning.length > 0 ? { reasoning } : {}),
-    ...(costOf(message, prices) ? { cost: costOf(message, prices) } : {}),
-  };
-  return turn;
-}
-
-function isTurn(turn: ViewTurn | null): turn is ViewTurn {
-  return turn !== null;
 }
 
 function attachmentsOf(parts: readonly Part[]): TurnAttachment[] {
@@ -274,19 +425,26 @@ function textOf(part: Part): string {
   return "";
 }
 
-function costOf(message: MessageWithParts, prices: Map<string, PriceEntry>): TurnCost | undefined {
-  const input = message.inputTokens ?? 0;
-  const output = message.outputTokens ?? 0;
+function costOfRun(
+  run: readonly MessageWithParts[],
+  prices: Map<string, PriceEntry>,
+): TurnCost | undefined {
+  const input = run.reduce((total, message) => total + (message.inputTokens ?? 0), 0);
+  const output = run.reduce((total, message) => total + (message.outputTokens ?? 0), 0);
   if (input === 0 && output === 0) {
     return undefined;
   }
-  const key = `${message.providerId ?? ""}:${message.modelId ?? ""}`;
+  const last = run.at(-1);
+  const key = `${last?.providerId ?? ""}:${last?.modelId ?? ""}`;
   const entry = prices.get(key);
-  const usd = message.costUsd ?? (entry?.pricing ? perMillion(input, output, entry.pricing) : null);
+  const costs = run.map((message) => numericCost(message, prices));
+  const usd = costs.every((cost): cost is number => cost !== null)
+    ? costs.reduce((total, cost) => total + cost, 0)
+    : null;
 
   return {
-    model: entry?.label ?? message.modelId ?? "unknown model",
-    ...(message.effort ? { effort: message.effort } : {}),
+    model: entry?.label ?? last?.modelId ?? "unknown model",
+    ...(last?.effort ? { effort: last.effort } : {}),
     tokens: `${input.toLocaleString()} in / ${output.toLocaleString()} out`,
     ...(usd === null ? {} : { usd: `$${usd.toFixed(4)}` }),
   };

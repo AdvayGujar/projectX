@@ -7,6 +7,13 @@ export interface PdfPageText {
   readonly text: string;
 }
 
+/** A unit that must not be split across chunks, such as a page, slide, or document section. */
+export interface ChunkSource {
+  readonly page: number | null;
+  readonly section: string | null;
+  readonly text: string;
+}
+
 export interface ChunkOptions {
   readonly targetTokens?: number;
   readonly minTokens?: number;
@@ -30,8 +37,7 @@ interface NormalizedOptions {
   readonly overlapRatio: number;
 }
 
-interface PageDraft {
-  readonly page: number;
+interface TextDraft {
   readonly text: string;
   readonly tokenEstimate: number;
 }
@@ -52,15 +58,29 @@ export function chunkPages(
   pages: readonly PdfPageText[],
   options: ChunkOptions = {},
 ): ChunkDraft[] {
+  return chunkSources(
+    pages.map((page) => ({ page: page.page, section: null, text: page.text })),
+    options,
+  );
+}
+
+/**
+ * Splits each source independently. A page, slide, or section never crosses its own
+ * boundary, so every chunk can point at one citation.
+ */
+export function chunkSources(
+  sources: readonly ChunkSource[],
+  options: ChunkOptions = {},
+): ChunkDraft[] {
   const normalized = normalizeOptions(options);
   const drafts: ChunkDraft[] = [];
 
-  for (const page of pages) {
-    for (const draft of chunkPage(page, normalized)) {
+  for (const source of sources) {
+    for (const draft of chunkSource(source, normalized)) {
       drafts.push({
         ordinal: drafts.length + 1,
-        page: draft.page,
-        section: null,
+        page: source.page,
+        section: source.section,
         text: draft.text,
         tokenEstimate: draft.tokenEstimate,
       });
@@ -70,19 +90,19 @@ export function chunkPages(
   return drafts;
 }
 
-function chunkPage(page: PdfPageText, options: NormalizedOptions): PageDraft[] {
-  const words = tokenize(page.text, options.maxTokens);
+function chunkSource(source: ChunkSource, options: NormalizedOptions): TextDraft[] {
+  const words = tokenize(source.text, options.maxTokens);
   if (words.length === 0) {
     return [];
   }
 
   const fullText = words.join(" ");
   if (estimateTokens(fullText) <= options.maxTokens) {
-    return [pageDraft(page.page, fullText)];
+    return [textDraft(fullText)];
   }
 
   const ranges = mergeShortTail(buildRanges(words, options), words, options);
-  return ranges.map((range) => pageDraft(page.page, joinRange(words, range)));
+  return ranges.map((range) => textDraft(joinRange(words, range)));
 }
 
 function buildRanges(words: readonly string[], options: NormalizedOptions): WordRange[] {
@@ -196,8 +216,8 @@ function splitOversizedWord(word: string, maxCharacters: number): string[] {
   return pieces;
 }
 
-function pageDraft(page: number, text: string): PageDraft {
-  return { page, text, tokenEstimate: estimateTokens(text) };
+function textDraft(text: string): TextDraft {
+  return { text, tokenEstimate: estimateTokens(text) };
 }
 
 function estimateRange(words: readonly string[], range: WordRange): number {

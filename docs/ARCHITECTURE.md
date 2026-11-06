@@ -41,8 +41,10 @@ apps/mobile/
 packages/core/src/
   providers/                    four wire-protocol adapters + catalog + registry
   engine/                       turn loop, context assembly, streamed parts
-  documents/                    path policy, kind detection, file importer, chunking, PDF extraction
-  db/                           schema, migrations, repositories, FTS search
+  tools/                        read-tool contracts, Zod schemas, and scoped implementations
+  documents/                    path policy, kind detection, file importer, chunking,
+                                PDF extraction, office/text parsers, structured extraction
+  db/                           schema, migrations, repositories (including artifacts), FTS
   paths.ts                      shared relative-path validation for db and documents
   ports.ts                      platform boundaries (file storage, PDF)
 
@@ -121,8 +123,16 @@ component and the screen that composes it.
 3. The existing `doc_chunks` FTS triggers do the indexing; query with
    `createSearchRepository(ctx).chunks(...)`. Only documents in `ready` are searchable, so a
    failed or aborted re-extraction keeps the last successful chunks but hides them from search.
-4. No screen wires extraction yet. It lands with `read_document` in M3 so the engine has a
-   document input path.
+4. `createStructuredExtractionService(ctx, storage)` handles DOCX, XLSX/CSV, PPTX, and text.
+   It reads bytes or text through `FileStoragePort`, parses in core, and replaces chunks in
+   one transaction. `ingestFile` dispatches by kind and returns the refreshed document row;
+   unknown kinds are marked as an extraction error rather than left pending.
+5. DOCX headings become sections and tables become pipe-separated rows. PPTX follows
+   `presentation.xml` order and includes notes. XLSX keeps values and formula text and stores
+   each row band's A1 range in `doc_chunks.section`; CSV goes through the same SheetJS reader.
+6. `read_document`, `read_sheet`, and `search_documents` only read extracted chunks. A path
+   is never accepted from the model, and every query is scoped to the chat's session and
+   project library.
 
 ### Build project chat context
 
@@ -219,14 +229,19 @@ component and the screen that composes it.
 
 ### Add a tool
 
-Tools are not built yet. When they are:
-1. One module in `packages/core/src/tools/` exporting a definition: schema, `read`/`write` role,
-   and an `execute` that returns a structured result.
-2. Register it in the tool registry passed to the engine.
-3. Never throw from a tool; return `{ isError: true }` so the turn survives.
+1. Create one module in `packages/core/src/tools/` using `defineTool`: a Zod `input`, an
+   explicit `read`/`write` role, and an `execute` that returns `{ content, display }`.
+   `content` is model-facing text; `display` is the short Thought line.
+2. Register it in `createReadTools` (or a later write-tool registry).
+3. Never throw for expected failures. `createToolExecutor` catches errors, validates input,
+   caps output at 8k characters, and returns `isError` instead of crashing the turn.
+4. Keep tool ids and scope checks in SQL: resolve the chat's project and files once, and never
+   accept a path or an unscoped file id from the model.
 
-The Thought disclosure already expects `read`/`write` roles, which is why the role belongs on
-the tool definition rather than being inferred from its name.
+The Thought disclosure reads the persisted `role` and `display` fields, so they belong on the
+tool contract rather than being inferred from a name. A multi-step turn is one transcript row:
+`loadSession` folds assistant/tool messages into one `ViewTurn`, and the live sink remaps each
+assistant message onto the first row before adopting the final message id.
 
 ### Change the look
 
@@ -243,8 +258,10 @@ service and keeping its exported signature (`sendTurn`, `stopTurn`, `SendTurnInp
 
 **Turns.** `apps/mobile/src/services/turnPort.ts` defines a `TurnPort` (`send`, `stop`,
 `isRunning`) and a `TurnSink` (`onUserTurn`, `onAssistantStart`, `onText`, `onReasoning`,
-`onUsage`, `onSettled`, `onError`). The port resolves the provider, key and model, runs the
-engine, and reports through the sink. It imports no store and no React.
+`onToolActivity`, `onUsage`, `onTurnFinished`, `onSettled`, `onError`). The port resolves the
+provider, key and model, supplies the read-tool registry, runs the engine, and reports through
+the sink. It imports no store and no React. `onAssistantStart` carries the engine step so the
+sink can keep one transcript row for a multi-step turn.
 
 `services/turnService.ts` is the composition root: `createTurnPort(createSessionStoreSink())`.
 A different shell supplies its own sink instead of importing the app's stores.
