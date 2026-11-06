@@ -105,18 +105,27 @@ function selectChunks(
     );
   }
 
-  const keep = wantsPages
-    ? (chunk: DocChunk) =>
+  return chunks
+    .filter(chunkFilter(selection, wantsPages))
+    .map((chunk) => toContextChunk(chunk, listing));
+}
+
+function chunkFilter(
+  selection: Selection,
+  wantsPages: boolean,
+): (chunk: DocChunk) => boolean {
+  if (wantsPages) {
+    return (chunk) =>
       chunk.page !== null &&
       (selection.pageStart === undefined || chunk.page >= selection.pageStart) &&
-      (selection.pageEnd === undefined || chunk.page <= selection.pageEnd)
-    : selection.section !== undefined
-      ? (chunk: DocChunk) =>
-        chunk.section !== null &&
-        chunk.section.toLowerCase().includes(selection.section?.toLowerCase() ?? "")
-      : () => true;
-
-  return chunks.filter(keep).map((chunk) => toContextChunk(chunk, listing));
+      (selection.pageEnd === undefined || chunk.page <= selection.pageEnd);
+  }
+  if (selection.section !== undefined) {
+    const needle = selection.section.toLowerCase();
+    return (chunk) =>
+      chunk.section !== null && chunk.section.toLowerCase().includes(needle);
+  }
+  return () => true;
 }
 
 function toContextChunk(chunk: DocChunk, listing: FileListing): ContextChunk {
