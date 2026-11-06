@@ -7,6 +7,8 @@ function props(overrides: Partial<Parameters<typeof Composer>[0]> = {}) {
     value: "",
     placeholder: "Ask me. Task me.",
     think: true,
+    thinkLabel: "Think",
+    thinkLocked: false,
     search: false,
     streaming: false,
     attachments: [],
@@ -52,8 +54,7 @@ describe("Composer", () => {
     expect(onStop).toHaveBeenCalledTimes(1);
   });
 
-  it("lists an attachment and removes it", async () => {
-    const onRemoveAttachment = jest.fn();
+  it("lists an attachment and removes it", async () => {    const onRemoveAttachment = jest.fn();
     await render(
       <Composer
         {...props({
@@ -75,5 +76,24 @@ describe("Composer", () => {
     fireEvent.press(screen.getByLabelText("Remove roadmap.docx"));
 
     expect(onRemoveAttachment).toHaveBeenCalledWith("a1");
+  });
+
+  it("locks the Think pill when the model cannot disable reasoning", async () => {
+    const onToggleThink = jest.fn();
+    await render(
+      <Composer
+        {...props({
+          think: true,
+          thinkLabel: "Always on",
+          thinkLocked: true,
+          onToggleThink,
+        })}
+      />,
+    );
+
+    const pill = screen.getByLabelText("Always on");
+    expect(pill.props.accessibilityState).toMatchObject({ checked: true, disabled: true });
+    fireEvent.press(pill);
+    expect(onToggleThink).not.toHaveBeenCalled();
   });
 });

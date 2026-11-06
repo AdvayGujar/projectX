@@ -108,8 +108,10 @@ export async function listAvailableModels(): Promise<ModelOption[]> {
           id: `${provider.id}:${model.id}`,
           label: model.label,
           provider: provider.label,
-          effort: model.capabilities.reasoning ? "Medium" : "Standard",
-          reasoning: model.capabilities.reasoning,
+          effort: defaultReasoningEffort(model),
+          reasoning: model.capabilities.reasoning.supported,
+          canDisableReasoning: model.capabilities.reasoning.canDisable,
+          reasoningEfforts: model.capabilities.reasoning.efforts,
           vision: model.capabilities.vision,
           tools: model.capabilities.tools,
         }));
@@ -117,4 +119,17 @@ export async function listAvailableModels(): Promise<ModelOption[]> {
   );
 
   return perProvider.flat();
+}
+
+/** Prefer the middle of the model's own list; never invent a level it does not accept. */
+function defaultReasoningEffort(model: ModelInfo): string {
+  const capabilities = model.capabilities.reasoning;
+  if (!capabilities.supported) {
+    return "standard";
+  }
+  if (capabilities.efforts.includes("medium")) {
+    return "medium";
+  }
+  const middle = capabilities.efforts[Math.floor(capabilities.efforts.length / 2)];
+  return middle ?? "on";
 }

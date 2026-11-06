@@ -3,6 +3,8 @@ import type { MessageRepository } from "../db";
 export interface StreamingPart {
   partId: string | null;
   text: string;
+  /** Provider signature for a reasoning part; never used for text. */
+  signature?: string;
   lastFlush: number;
 }
 
@@ -32,22 +34,18 @@ export async function flushStreamingPart(
   type: "text" | "reasoning",
   now: number,
 ): Promise<void> {
-  if (state.partId === null && state.text.length === 0) {
+  if (state.partId === null && state.text.length === 0 && !state.signature) {
     return;
   }
   const searchText = type === "text" ? state.text : null;
+  const data = type === "reasoning" && state.signature
+    ? { text: state.text, signature: state.signature }
+    : { text: state.text };
   if (state.partId === null) {
-    const part = await repository.appendPart(messageId, {
-      type,
-      data: { text: state.text },
-      searchText,
-    });
+    const part = await repository.appendPart(messageId, { type, data, searchText });
     state.partId = part.id;
   } else {
-    await repository.updatePart(state.partId, {
-      data: { text: state.text },
-      searchText,
-    });
+    await repository.updatePart(state.partId, { data, searchText });
   }
   state.lastFlush = now;
 }

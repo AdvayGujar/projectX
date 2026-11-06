@@ -29,6 +29,7 @@ describe("regeneration", () => {
     expect(target).toEqual({
       selectionId: "provider-1:deepseek-reasoner",
       effort: "High",
+      reasoning: { mode: "on", effort: "high" },
       text: "Explain the report",
     });
     expect((await messages.list(session.id)).map((message) => message.id)).toEqual([

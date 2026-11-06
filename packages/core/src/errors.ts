@@ -6,6 +6,7 @@ export type AppErrorCode =
   | "provider_rate_limit"
   | "provider_unavailable"
   | "provider_invalid_response"
+  | "invalid_request"
   | "tool_invalid_input"
   | "tool_failed"
   | "artifact_invalid_spec"

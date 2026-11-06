@@ -48,6 +48,7 @@ function makeRequest(model: ModelInfo, overrides: Partial<CompletionRequest> = {
     system: "You are helpful.",
     messages: [{ role: "user", parts: [{ type: "text", text: "Hi" }] }],
     maxOutputTokens: 100,
+    reasoning: { mode: "off" },
     sessionId: "session-1",
     ...overrides,
   };
@@ -99,7 +100,7 @@ describe("openai-chat adapter", () => {
     ]);
     const events = await collect(
       createOpenAiChatAdapter(),
-      makeRequest({ ...fixtureModel("deepseek"), id: "deepseek-reasoner" }),
+      makeRequest({ ...fixtureModel("deepseek"), id: "deepseek-v4-pro" }),
       runtime(fetchImpl),
     );
 
@@ -128,12 +129,13 @@ describe("openai-chat adapter", () => {
 
   it("lists models and merges known capabilities", async () => {
     const fetchImpl: FetchLike = async () => new Response(JSON.stringify({
-      data: [{ id: "deepseek-chat" }, { id: "deepseek-reasoner" }],
+      data: [{ id: "deepseek-flash" }, { id: "deepseek-v4-pro" }],
     }), { status: 200, headers: { "content-type": "application/json" } });
     const models = await createOpenAiChatAdapter().listModels(runtime(fetchImpl));
 
-    expect(models.map((model) => model.id)).toEqual(["deepseek-chat", "deepseek-reasoner"]);
-    expect(models[1]?.capabilities.reasoning).toBe(true);
+    expect(models.map((model) => model.id)).toEqual(["deepseek-flash", "deepseek-v4-pro"]);
+    expect(models[1]?.capabilities.reasoning.supported).toBe(true);
+    expect(models[1]?.capabilities.reasoning.canDisable).toBe(true);
   });
 
   it("maps authentication failures", async () => {
@@ -183,4 +185,123 @@ describe("openai-chat adapter", () => {
 
     expect(captured).toBe(controller.signal);
   });
+
+  it("reads OpenRouter reasoning support from supported_parameters", async () => {
+    const fetchImpl: FetchLike = async () => new Response(JSON.stringify({
+      data: [
+        { id: "reasoning-model", supported_parameters: ["tools", "reasoning"] },
+        { id: "plain-model", supported_parameters: ["tools"] },
+      ],
+    }), { status: 200, headers: { "content-type": "application/json" } });
+    const models = await createOpenAiChatAdapter().listModels(runtime(fetchImpl, "openrouter"));
+
+    expect(models[0]?.capabilities.reasoning).toMatchObject({
+      supported: true,
+      canDisable: true,
+    });
+    expect(models[0]?.capabilities.reasoning.efforts).toContain("xhigh");
+    expect(models[1]?.capabilities.reasoning.supported).toBe(false);
+  });
+
+  it("maps DeepSeek thinking off and effort to the chat fields", async () => {
+    const off = await captureBody("deepseek", { mode: "off" });
+    expect(off.body.thinking).toEqual({ type: "disabled" });
+    expect(off.body.reasoning_effort).toBeUndefined();
+
+    const on = await captureBody("deepseek", { mode: "on", effort: "high" });
+    expect(on.body.reasoning_effort).toBe("high");
+    expect(on.body.thinking).toBeUndefined();
+  });
+
+  it("maps OpenRouter and Groq reasoning dialects", async () => {
+    const openRouterOff = await captureBody("openrouter", { mode: "off" });
+    expect(openRouterOff.body.reasoning).toEqual({ effort: "none" });
+
+    const openRouterOn = await captureBody("openrouter", { mode: "on", effort: "xhigh" });
+    expect(openRouterOn.body.reasoning).toEqual({ effort: "xhigh" });
+
+    const groqOff = await captureBody("groq", { mode: "off" });
+    expect(groqOff.body.reasoning_effort).toBe("none");
+
+    const groqOn = await captureBody("groq", { mode: "on", effort: "medium" });
+    expect(groqOn.body.reasoning_effort).toBe("medium");
+  });
+
+  it("sends no reasoning field to OpenCode Go, which cannot be verified", async () => {
+    const { body } = await captureBody("opencode-go", { mode: "on" });
+    expect(body).not.toHaveProperty("thinking");
+    expect(body).not.toHaveProperty("reasoning");
+    expect(body).not.toHaveProperty("reasoning_effort");
+  });
+
+  it("sends no reasoning field to a custom endpoint", async () => {
+    const { body } = await captureBody("custom", { mode: "off" });
+    expect(body).not.toHaveProperty("thinking");
+    expect(body).not.toHaveProperty("reasoning");
+    expect(body).not.toHaveProperty("reasoning_effort");
+  });
+
+  it("replays reasoning_content for a DeepSeek tool loop", async () => {
+    const { body } = await captureBody(
+      "deepseek",
+      { mode: "on", effort: "high" },
+      [
+        { role: "user", parts: [{ type: "text", text: "Read page 1" }] },
+        {
+          role: "assistant",
+          parts: [
+            { type: "reasoning", text: "I should read page 1" },
+            { type: "tool_call", id: "c1", name: "read_document", arguments: { page: 1 } },
+          ],
+        },
+        {
+          role: "tool",
+          parts: [{ type: "tool_result", toolCallId: "c1", name: "read_document", content: "page" }],
+        },
+      ],
+    );
+    const assistant = (body.messages as Array<Record<string, unknown>>)
+      .find((message) => message.role === "assistant");
+    expect(assistant?.reasoning_content).toBe("I should read page 1");
+  });
+
+  it("does not replay reasoning_content to an endpoint that does not use it", async () => {
+    const { body } = await captureBody(
+      "openrouter",
+      { mode: "on", effort: "high" },
+      [
+        {
+          role: "assistant",
+          parts: [
+            { type: "reasoning", text: "private plan" },
+            { type: "tool_call", id: "c1", name: "read_document", arguments: {} },
+          ],
+        },
+      ],
+    );
+    const assistant = (body.messages as Array<Record<string, unknown>>)
+      .find((message) => message.role === "assistant");
+    expect(assistant?.reasoning_content).toBeUndefined();
+  });
 });
+
+async function captureBody(
+  preset: string,
+  reasoning: CompletionRequest["reasoning"],
+  messages?: CompletionRequest["messages"],
+): Promise<{ body: Record<string, unknown> }> {
+  let body: Record<string, unknown> = {};
+  const fetchImpl: FetchLike = async (_url, init) => {
+    body = JSON.parse(init?.body ?? "{}") as Record<string, unknown>;
+    return streamResponse(["data: [DONE]\n\n"]);
+  };
+  await collect(
+    createOpenAiChatAdapter(),
+    makeRequest(fixtureModel("deepseek"), {
+      reasoning,
+      ...(messages ? { messages } : {}),
+    }),
+    runtime(fetchImpl, preset),
+  );
+  return { body };
+}

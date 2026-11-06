@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createAnthropicAdapter } from "../anthropic";
 import { toAnthropicMessages } from "../anthropicMessages";
 import { knownModels } from "../registry";
-import type { FetchInit, FetchLike, ModelInfo } from "../types";
+import type { FetchInit, FetchLike, ModelInfo, ReasoningRequest } from "../types";
 import {
   collect,
   data,
@@ -41,6 +41,35 @@ describe("anthropic messages conversion", () => {
     expect(result.system).toBe("System");
     expect(result.messages.map((message) => message.role)).toEqual(["user", "assistant", "user"]);
     expect(result.messages[2]?.content[0]).toMatchObject({ type: "tool_result", tool_use_id: "t1" });
+  });
+
+  it("replays signed thinking blocks only on a tool-use assistant message", () => {
+    const withTool = toAnthropicMessages("System", [
+      {
+        role: "assistant",
+        parts: [
+          { type: "reasoning", text: "plan", signature: "sig-1" },
+          { type: "text", text: "Reading" },
+          { type: "tool_call", id: "t1", name: "read_document", arguments: { page: 1 } },
+        ],
+      },
+    ]);
+    expect(withTool.messages[0]?.content[0]).toEqual({
+      type: "thinking",
+      thinking: "plan",
+      signature: "sig-1",
+    });
+
+    const finalAnswer = toAnthropicMessages("System", [
+      {
+        role: "assistant",
+        parts: [
+          { type: "reasoning", text: "plan", signature: "sig-1" },
+          { type: "text", text: "Done" },
+        ],
+      },
+    ]);
+    expect(finalAnswer.messages[0]?.content).toEqual([{ type: "text", text: "Done" }]);
   });
 });
 
@@ -103,6 +132,34 @@ describe("anthropic adapter", () => {
     expect(events.at(-1)).toEqual({ type: "done", stopReason: "tool_calls" });
   });
 
+  it("streams a thinking signature before the block closes", async () => {
+    const fetchImpl: FetchLike = async () => sseResponse([
+      event("content_block_start", { type: "content_block_start", index: 0, content_block: { type: "thinking" } }),
+      event("content_block_delta", { type: "content_block_delta", index: 0, delta: { type: "thinking_delta", thinking: "plan" } }),
+      event("content_block_delta", { type: "content_block_delta", index: 0, delta: { type: "signature_delta", signature: "sig-1" } }),
+      event("content_block_stop", { type: "content_block_stop", index: 0 }),
+      event("message_stop", { type: "message_stop" }),
+    ]);
+    const events = await collect(
+      createAnthropicAdapter(),
+      requestFor(fixtureModel()),
+      runtimeFor(fetchImpl, "anthropic"),
+    );
+
+    expect(events).toContainEqual({ type: "reasoning_delta", text: "plan" });
+    expect(events).toContainEqual({ type: "reasoning_signature", signature: "sig-1" });
+  });
+
+  it("maps thinking off and effort to Anthropic fields", async () => {
+    const off = await captureBody({ mode: "off" });
+    expect(off.thinking).toEqual({ type: "disabled" });
+    expect(off.output_config).toBeUndefined();
+
+    const on = await captureBody({ mode: "on", effort: "high" });
+    expect(on.output_config).toEqual({ effort: "high" });
+    expect(on.thinking).toBeUndefined();
+  });
+
   it("sends Anthropic headers and the Go session header", async () => {
     let init: FetchInit | undefined;
     const fetchImpl: FetchLike = async (_url, requestInit) => {
@@ -136,3 +193,17 @@ describe("anthropic adapter", () => {
     ).rejects.toMatchObject({ code: "provider_auth" });
   });
 });
+
+async function captureBody(reasoning: ReasoningRequest): Promise<Record<string, unknown>> {
+  let body: Record<string, unknown> = {};
+  const fetchImpl: FetchLike = async (_url, init) => {
+    body = JSON.parse(init?.body ?? "{}") as Record<string, unknown>;
+    return sseResponse([event("message_stop", { type: "message_stop" })]);
+  };
+  await collect(
+    createAnthropicAdapter(),
+    requestFor(fixtureModel(), { reasoning }),
+    runtimeFor(fetchImpl, "anthropic"),
+  );
+  return body;
+}

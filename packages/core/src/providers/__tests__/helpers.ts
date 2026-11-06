@@ -49,6 +49,7 @@ export function requestFor(model: ModelInfo, overrides: Partial<CompletionReques
     system: "You are helpful.",
     messages: [{ role: "user", parts: [{ type: "text", text: "Hi" }] }],
     maxOutputTokens: 100,
+    reasoning: { mode: "off" },
     sessionId: "session-1",
     ...overrides,
   };

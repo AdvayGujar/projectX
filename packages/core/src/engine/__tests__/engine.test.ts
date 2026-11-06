@@ -384,4 +384,114 @@ describe("turn engine", () => {
     expect(tool.calls).toHaveLength(2);
     expect(await messages.count(session.id)).toBe(5);
   }));
+
+  it("persists signed reasoning and replays it in the tool loop", () => withContext(async (ctx) => {
+    const sessions = createSessionRepository(ctx);
+    const messages = createMessageRepository(ctx);
+    const session = await sessions.create({});
+    const { adapter, requests } = scripted([
+      [
+        { type: "reasoning_delta", text: "plan" },
+        { type: "reasoning_signature", signature: "sig-1" },
+        { type: "tool_call_start", id: "c1", name: "read_document" },
+        { type: "tool_call_delta", id: "c1", argumentsJson: '{"page":1}' },
+        { type: "tool_call_signature", id: "c1", signature: "call-sig" },
+        { type: "tool_call_end", id: "c1" },
+        { type: "done", stopReason: "tool_calls" },
+      ],
+      [
+        { type: "text_delta", text: "Finished" },
+        { type: "done", stopReason: "stop" },
+      ],
+    ]);
+    const tool = toolExecutor("page 1");
+    const events: TurnEvent[] = [];
+    const engine = createTurnEngine({ db: ctx, adapter, tools: tool.tools });
+
+    await engine.runTurn({
+      sessionId: session.id,
+      model: fixtureModel(),
+      provider,
+      system: "",
+      userParts: [{ type: "text", data: { text: "Read" } }],
+      maxOutputTokens: 100,
+      reasoning: { mode: "on", effort: "high" },
+      onEvent: (event) => events.push(event),
+    });
+
+    const history = await messages.list(session.id);
+    const reasoningPart = history[1]?.parts.find((part) => part.type === "reasoning");
+    const toolCallPart = history[1]?.parts.find((part) => part.type === "tool_call");
+    expect(reasoningPart?.data).toEqual({ text: "plan", signature: "sig-1" });
+    expect(toolCallPart?.data).toMatchObject({ thoughtSignature: "call-sig" });
+    expect(events.some((event) => event.type === "reasoning_delta")).toBe(true);
+
+    const firstAssistant = requests[1]?.messages.find((message) => message.role === "assistant");
+    expect(firstAssistant?.parts).toContainEqual({
+      type: "reasoning",
+      text: "plan",
+      signature: "sig-1",
+    });
+    expect(firstAssistant?.parts).toContainEqual({
+      type: "tool_call",
+      id: "c1",
+      name: "read_document",
+      arguments: { page: 1 },
+      thoughtSignature: "call-sig",
+    });
+  }));
+
+  it("drops reasoning when the turn runs with Think off", () => withContext(async (ctx) => {
+    const sessions = createSessionRepository(ctx);
+    const messages = createMessageRepository(ctx);
+    const session = await sessions.create({});
+    const { adapter } = scripted([[
+      { type: "reasoning_delta", text: "secret plan" },
+      { type: "reasoning_signature", signature: "sig-1" },
+      { type: "text_delta", text: "Answer" },
+      { type: "done", stopReason: "stop" },
+    ]]);
+    const events: TurnEvent[] = [];
+    const engine = createTurnEngine({ db: ctx, adapter, tools: noTools });
+
+    await engine.runTurn({
+      sessionId: session.id,
+      model: fixtureModel(),
+      provider,
+      system: "",
+      userParts: [{ type: "text", data: { text: "Hi" } }],
+      maxOutputTokens: 100,
+      reasoning: { mode: "off" },
+      onEvent: (event) => events.push(event),
+    });
+
+    const history = await messages.list(session.id);
+    expect(history[1]?.parts.map((part) => part.type)).toEqual(["text"]);
+    expect(events.some((event) => event.type === "reasoning_delta")).toBe(false);
+  }));
+
+  it("rejects reasoning controls the model cannot honour", () => withContext(async (ctx) => {
+    const sessions = createSessionRepository(ctx);
+    const messages = createMessageRepository(ctx);
+    const session = await sessions.create({});
+    const argon = knownModels("google")[0];
+    if (!argon) {
+      throw new Error("missing fixture model");
+    }
+    const { adapter, requests } = scripted([[]]);
+    const engine = createTurnEngine({ db: ctx, adapter, tools: noTools });
+
+    await expect(engine.runTurn({
+      sessionId: session.id,
+      model: argon,
+      provider,
+      system: "",
+      userParts: [{ type: "text", data: { text: "Hi" } }],
+      maxOutputTokens: 100,
+      reasoning: { mode: "off" },
+    })).rejects.toMatchObject({ code: "invalid_request" });
+
+    expect(requests).toHaveLength(0);
+    expect(await messages.count(session.id)).toBe(0);
+  }));
 });

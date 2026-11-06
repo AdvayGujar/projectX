@@ -96,6 +96,7 @@ export type { TranscriptProps } from "./session/Transcript";
 export { colors, HIT_SLOP, monoFont, radius, space, typography } from "./theme";
 
 export { REASONING_EFFORTS } from "./types";
+export { effortLabel } from "./session/format";
 export type {
   AttachmentChip,
   CitationRef,

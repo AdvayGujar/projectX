@@ -1,7 +1,8 @@
 import { z } from "zod";
 
 import { AppError } from "../../errors";
-import type { ModelInfo, Protocol } from "../../providers";
+import { REASONING_EFFORTS } from "../../providers";
+import type { ModelInfo, Protocol, ReasoningCapabilities } from "../../providers";
 import type { DbContext, SqlDatabase, SqlValue } from "../types";
 import { toDbError } from "./errors";
 
@@ -22,6 +23,25 @@ interface ModelRow {
 
 const PROTOCOLS: readonly Protocol[] = ["openai-chat", "openai-responses", "anthropic", "google"];
 
+const reasoningEffortSchema = z.enum(REASONING_EFFORTS);
+
+/**
+ * Cached rows written before per-model reasoning control stored a boolean. They still load,
+ * as always-on with no effort control, until `applyKnownCapabilities` heals them.
+ */
+const reasoningSchema = z.union([
+  z.boolean().transform((supported): ReasoningCapabilities => ({
+    supported,
+    canDisable: false,
+    efforts: [],
+  })),
+  z.object({
+    supported: z.boolean(),
+    canDisable: z.boolean().default(false),
+    efforts: z.array(reasoningEffortSchema).default([]),
+  }),
+]) satisfies z.ZodType<ReasoningCapabilities>;
+
 const modelSchema = z.object({
   id: z.string(),
   label: z.string(),
@@ -32,7 +52,7 @@ const modelSchema = z.object({
   capabilities: z.object({
     tools: z.boolean(),
     vision: z.boolean(),
-    reasoning: z.boolean(),
+    reasoning: reasoningSchema,
   }),
   pricing: z
     .object({

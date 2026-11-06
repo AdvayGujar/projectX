@@ -78,6 +78,11 @@ function buildBody(request: CompletionRequest): Record<string, unknown> {
       parameters: tool.parameters,
     }));
   }
+  if (request.reasoning.mode === "off") {
+    body.reasoning = { effort: "none" };
+  } else if (request.reasoning.effort) {
+    body.reasoning = { effort: request.reasoning.effort };
+  }
   return body;
 }
 

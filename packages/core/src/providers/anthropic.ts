@@ -82,6 +82,11 @@ function buildBody(
       input_schema: tool.parameters,
     }));
   }
+  if (request.reasoning.mode === "off") {
+    body.thinking = { type: "disabled" };
+  } else if (request.reasoning.effort) {
+    body.output_config = { effort: request.reasoning.effort };
+  }
   return body;
 }
 

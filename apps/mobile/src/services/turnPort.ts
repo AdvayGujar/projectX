@@ -1,5 +1,6 @@
 import {
   AppError,
+  applyKnownCapabilities,
   createAdapter,
   createArtifactRepository,
   createProjectContextRetriever,
@@ -18,6 +19,7 @@ import type {
   ModelInfo,
   PartInput,
   ProviderRuntime,
+  ReasoningRequest,
 } from "@projectx/core";
 
 import type { CitationRef, ToolActivity, TurnAttachment } from "@projectx/ui";
@@ -72,7 +74,7 @@ export interface TurnInput {
   /** `providerRowId:modelId`, as shown in the picker. */
   readonly selectionId: string;
   readonly effort: string;
-  readonly think: boolean;
+  readonly reasoning: ReasoningRequest;
   readonly images?: readonly ImageAttachment[];
   readonly documents?: readonly DocumentAttachment[];
   /** Re-runs the answer to an existing user message instead of appending a new one. */
@@ -115,7 +117,10 @@ export function createTurnPort(sink: TurnSink): TurnPort {
         });
       }
 
-      const model = await findModel(await providers.listModels(provider.id), parsed.modelId);
+      const model = await findModel(
+        applyKnownCapabilities(provider.presetId, await providers.listModels(provider.id)),
+        parsed.modelId,
+      );
       const system = await systemPromptFor(context, input, model);
       const config = createProviderConfig(provider.presetId, {
         id: provider.id,
@@ -139,6 +144,7 @@ export function createTurnPort(sink: TurnSink): TurnPort {
         provider: runtime,
         system,
         effort: input.effort,
+        reasoning: input.reasoning,
         userParts: input.regenerate ? [] : userParts(input),
         tools: model.capabilities.tools ? tools.schemas : [],
         maxOutputTokens: Math.min(model.maxOutput, MAX_OUTPUT_TOKENS),
@@ -151,15 +157,13 @@ export function createTurnPort(sink: TurnSink): TurnPort {
               }
               break;
             case "message_started":
-              sink.onAssistantStart(event.messageId, input.think, event.step);
+              sink.onAssistantStart(event.messageId, input.reasoning.mode === "on", event.step);
               break;
             case "text_delta":
               sink.onText(event.messageId, event.text);
               break;
             case "reasoning_delta":
-              if (input.think) {
-                sink.onReasoning(event.messageId, event.text);
-              }
+              sink.onReasoning(event.messageId, event.text);
               break;
             case "tool_result":
               sink.onToolActivity(event.assistantMessageId, {

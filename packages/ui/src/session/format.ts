@@ -19,8 +19,28 @@ export function summarise(turn: ViewTurn): string {
   return parts.join(" · ");
 }
 
+const EFFORT_LABELS: Readonly<Record<string, string>> = {
+  minimal: "Minimal",
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+  xhigh: "Extra high",
+  max: "Max",
+  off: "Off",
+  on: "On",
+  standard: "Standard",
+};
+
+/** Stored values are lower case; older messages may hold display values. */
+export function effortLabel(value: string | undefined): string {
+  if (!value) {
+    return "";
+  }
+  return EFFORT_LABELS[value.trim().toLowerCase()] ?? value;
+}
+
 export function costLine(cost: NonNullable<ViewTurn["cost"]>): string {
-  return [cost.model, cost.effort, cost.tokens, cost.usd]
+  return [cost.model, cost.effort ? effortLabel(cost.effort) : undefined, cost.tokens, cost.usd]
     .filter((part): part is string => Boolean(part))
     .join(" · ");
 }

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createOpenAiResponsesAdapter } from "../openaiResponses";
 import { toResponsesInput } from "../openaiResponsesMessages";
 import { knownModels } from "../registry";
-import type { FetchInit, FetchLike, ModelInfo } from "../types";
+import type { FetchInit, FetchLike, ModelInfo, ReasoningRequest } from "../types";
 import { collect, data, requestFor, runtimeFor, sseResponse } from "./helpers";
 
 function fixtureModel(id = "gpt-6-luna"): ModelInfo {
@@ -132,4 +132,25 @@ describe("openai responses adapter", () => {
       ),
     ).rejects.toMatchObject({ code: "provider_auth" });
   });
+
+  it("maps thinking off and effort to reasoning.effort", async () => {
+    expect((await captureBody({ mode: "off" })).reasoning).toEqual({ effort: "none" });
+    expect((await captureBody({ mode: "on", effort: "xhigh" })).reasoning).toEqual({
+      effort: "xhigh",
+    });
+  });
 });
+
+async function captureBody(reasoning: ReasoningRequest): Promise<Record<string, unknown>> {
+  let body: Record<string, unknown> = {};
+  const fetchImpl: FetchLike = async (_url, init) => {
+    body = JSON.parse(init?.body ?? "{}") as Record<string, unknown>;
+    return sseResponse([data({ type: "response.completed", response: { status: "completed", output: [] } })]);
+  };
+  await collect(
+    createOpenAiResponsesAdapter(),
+    requestFor(fixtureModel(), { reasoning }),
+    runtimeFor(fetchImpl, "openai"),
+  );
+  return body;
+}

@@ -5,6 +5,7 @@ import type { ProviderEvent } from "./types";
 interface GooglePart {
   text?: string;
   thought?: boolean;
+  thoughtSignature?: string;
   functionCall?: { name?: string; args?: unknown };
 }
 
@@ -49,10 +50,18 @@ export async function* streamGoogleEvents(
     for (const part of candidate.content?.parts ?? []) {
       if (part.functionCall?.name) {
         hasCalls = true;
-        yield* functionCallEvents(part.functionCall.name, part.functionCall.args, callIndex);
+        yield* functionCallEvents(
+          part.functionCall.name,
+          part.functionCall.args,
+          part.thoughtSignature,
+          callIndex,
+        );
         callIndex += 1;
       } else if (part.text && part.thought) {
         yield { type: "reasoning_delta", text: part.text };
+        if (part.thoughtSignature) {
+          yield { type: "reasoning_signature", signature: part.thoughtSignature };
+        }
       } else if (part.text) {
         yield { type: "text_delta", text: part.text };
       }
@@ -68,10 +77,18 @@ export async function* streamGoogleEvents(
   yield { type: "done", stopReason: hasCalls ? "tool_calls" : stopReason };
 }
 
-function* functionCallEvents(name: string, args: unknown, index: number): Generator<ProviderEvent> {
+function* functionCallEvents(
+  name: string,
+  args: unknown,
+  thoughtSignature: string | undefined,
+  index: number,
+): Generator<ProviderEvent> {
   const id = `call_${index}`;
   yield { type: "tool_call_start", id, name };
   yield { type: "tool_call_delta", id, argumentsJson: JSON.stringify(args ?? {}) };
+  if (thoughtSignature) {
+    yield { type: "tool_call_signature", id, signature: thoughtSignature };
+  }
   yield { type: "tool_call_end", id };
 }
 

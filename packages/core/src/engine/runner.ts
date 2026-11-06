@@ -1,7 +1,8 @@
 import { AppError } from "../errors";
 import { createMessageRepository } from "../db";
 import type { MessageRepository, Usage } from "../db";
-import type { CompletionRequest, ProviderEvent, ToolSchema } from "../providers";
+import { assertReasoningRequest } from "../providers";
+import type { CompletionRequest, ProviderEvent, ReasoningRequest, ToolSchema } from "../providers";
 import { buildContext } from "./context";
 import {
   appendStreamingText,
@@ -28,7 +29,8 @@ const MIN_CONTEXT_TOKENS = 4_000;
 interface StreamState {
   text: StreamingPart;
   reasoning: StreamingPart;
-  pending: Map<string, { name: string; args: string }>;
+  captureReasoning: boolean;
+  pending: Map<string, { name: string; args: string; signature?: string }>;
   toolCalls: ToolCall[];
   usage?: Usage;
   stopReason: "stop" | "tool_calls" | "length" | "error";
@@ -42,6 +44,8 @@ export function createTurnEngine({ db, adapter, tools }: EngineDeps) {
   return {
     async runTurn(options: RunTurnOptions): Promise<TurnResult> {
       const emit: Emit = (event) => options.onEvent?.(event);
+      const reasoning = reasoningOf(options);
+      assertReasoningRequest(options.model, reasoning);
       const user = options.userParts.length > 0
         ? await messages.append({
           sessionId: options.sessionId,
@@ -63,6 +67,7 @@ export function createTurnEngine({ db, adapter, tools }: EngineDeps) {
         const context = await buildContext(db, options.sessionId, {
           system: options.system,
           maxTokens: contextBudget(options),
+          includeReasoning: reasoning.mode === "on",
         });
         const assistant = await messages.append({
           sessionId: options.sessionId,
@@ -147,6 +152,7 @@ async function streamAssistant(
   const state: StreamState = {
     text: createStreamingPart(),
     reasoning: createStreamingPart(),
+    captureReasoning: reasoningOf(options).mode === "on",
     pending: new Map(),
     toolCalls: [],
     stopReason: "stop",
@@ -184,14 +190,28 @@ async function handleEvent(
     await appendStreamingText(messages, assistantId, state.text, "text", event.text, now());
     emit({ type: "text_delta", messageId: assistantId, text: event.text });
   } else if (event.type === "reasoning_delta") {
+    if (!state.captureReasoning) {
+      return;
+    }
     await appendStreamingText(messages, assistantId, state.reasoning, "reasoning", event.text, now());
     emit({ type: "reasoning_delta", messageId: assistantId, text: event.text });
+  } else if (event.type === "reasoning_signature") {
+    if (!state.captureReasoning) {
+      return;
+    }
+    state.reasoning.signature = event.signature;
+    await flushStreamingPart(messages, assistantId, state.reasoning, "reasoning", now());
   } else if (event.type === "tool_call_start") {
     state.pending.set(event.id, { name: event.name, args: "" });
   } else if (event.type === "tool_call_delta") {
     const pending = state.pending.get(event.id);
     if (pending) {
       pending.args += event.argumentsJson;
+    }
+  } else if (event.type === "tool_call_signature") {
+    const pending = state.pending.get(event.id);
+    if (pending) {
+      pending.signature = event.signature;
     }
   } else if (event.type === "tool_call_end") {
     await finishToolCall(state, event.id, messages, assistantId, emit, roleOf);
@@ -228,6 +248,7 @@ async function finishToolCall(
     name,
     arguments: parseArguments(pending.args),
     role: roleOf(name),
+    ...(pending.signature ? { thoughtSignature: pending.signature } : {}),
   };
   state.toolCalls.push(call);
   await messages.appendPart(assistantId, { type: "tool_call", data: call });
@@ -329,8 +350,13 @@ function buildRequest(
     temperature: options.temperature,
     maxOutputTokens: options.maxOutputTokens,
     sessionId: options.sessionId,
+    reasoning: reasoningOf(options),
     signal: options.signal,
   };
+}
+
+function reasoningOf(options: RunTurnOptions): ReasoningRequest {
+  return options.reasoning ?? { mode: "off" };
 }
 
 function contextBudget(options: RunTurnOptions): number {

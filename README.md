@@ -9,29 +9,31 @@ Engineering rules: `AGENTS.md`.
 
 ## Status
 
-- **M0, M1, M2, M3.1, and M3.2 are complete.** 384 tests pass: core 236, ui 24, mobile 124.
-  `pnpm typecheck` passes. `pnpm lint` is still a placeholder in every package.
+- **M0–M3.2 complete; M3.2a implemented on `feat/m3.2a-reasoning-control`.** 423 tests pass:
+  core 265, ui 25, mobile 133. `pnpm typecheck` passes. `pnpm lint` is still a placeholder in
+  every package.
 - **M3.1 includes:** `list_files`, `read_document`, `read_sheet`, `search_documents`, and
   `get_artifact`; DOCX/XLSX/PPTX/text extraction into chunks; tool activity in the Thought row.
 - **M3.2 includes:** structured citations from read/search results, tappable source chips, and a
   cited-page sheet with Open file.
-- **Known gaps:** the Think toggle does not send a reasoning field yet (M3.2a); web search and
-  full-page reads are M3.2b; memory v1 is M3.3; artifact creation and versions wait for M4.
+- **M3.2a includes:** a neutral `ReasoningRequest`, per-model `canDisable`/effort capabilities,
+  real disable/effort fields in every adapter, `Always on` for models that cannot disable, and
+  reasoning history (`reasoning_content`, thinking signatures, thought signatures) for tool
+  loops. Device verification is still pending.
+- **Known gaps:** web search and full-page reads are M3.2b; memory v1 is M3.3; artifact creation
+  and versions wait for M4.
 - **Verified on device (2026-11-06):** iOS 27.2 simulator and the `ProjectX_Pixel` Android
   emulator. Home, projects, project detail, library, search, file opening, and the session
   menu render. Android without an installed PDF viewer uses the share sheet, as intended.
 
-## Next: M3.2a, then M3.2b
+## Next: M3.2b, then M3.3
 
-M3.1 and M3.2 are merged. The next work is:
+M3.1 and M3.2 are merged, and M3.2a is ready for review. The next work is:
 
-1. **Reasoning control** — a neutral `ReasoningRequest`, per-model `canDisable`/effort
-   capabilities, adapter mapping, and reasoning history for tool loops. Think off must send
-   the provider's disable field, not just hide the block.
-2. **Web search** — provider-native first (DeepSeek/Kimi raw search+fetch, Anthropic/OpenAI/
+1. **Web search** — provider-native first (DeepSeek/Kimi raw search+fetch, Anthropic/OpenAI/
    Google/xAI/OpenRouter server tools, Groq browser search), then BYO third-party adapters
    (Brave, Tavily, Exa, Firecrawl, Parallel). No app-run search service.
-3. **Then M3.3** — memory v1 (global/project memory, `update_memory`, budgeted context).
+2. **Then M3.3** — memory v1 (global/project memory, `update_memory`, budgeted context).
 
 ## Requirements
 

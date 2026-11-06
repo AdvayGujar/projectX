@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { createAdapter } from "./adapterFactory";
 import { providerError } from "./errors";
+import { reasoningFromCatalog } from "./reasoning";
 import { mergeFetchedModels } from "./registry";
 import type { FetchedModelInfo } from "./registry";
 import type { FetchLike, ModelInfo, ProviderConfig } from "./types";
@@ -90,7 +91,7 @@ function toFetchedModel(raw: unknown): FetchedModelInfo[] {
       ? { tools: model.capabilities.tools.supported }
       : {}),
     ...(model.capabilities?.reasoning
-      ? { reasoning: model.capabilities.reasoning.supported }
+      ? { reasoning: reasoningFromCatalog(model.capabilities.reasoning.supported) }
       : {}),
     ...(model.limit?.context === undefined ? {} : { contextWindow: model.limit.context }),
     ...(model.limit?.output === undefined ? {} : { maxOutput: model.limit.output }),

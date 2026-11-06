@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ViewTurn } from "../../types";
-import { costLine, streamingLabel, summarise } from "../format";
+import { costLine, effortLabel, streamingLabel, summarise } from "../format";
 
 const base: ViewTurn = { id: "t1", role: "assistant", text: "hi" };
 
@@ -46,7 +46,7 @@ describe("summarise", () => {
 describe("costLine", () => {
   it("joins every present part", () => {
     expect(
-      costLine({ model: "Beam Free", effort: "High", tokens: "10 in / 5 out", usd: "$0.0001" }),
+      costLine({ model: "Beam Free", effort: "high", tokens: "10 in / 5 out", usd: "$0.0001" }),
     ).toBe("Beam Free · High · 10 in / 5 out · $0.0001");
   });
 
@@ -54,6 +54,16 @@ describe("costLine", () => {
     expect(costLine({ model: "Beam Free", tokens: "10 in / 5 out" })).toBe(
       "Beam Free · 10 in / 5 out",
     );
+  });
+});
+
+describe("effortLabel", () => {
+  it("labels neutral effort values for display", () => {
+    expect(effortLabel("xhigh")).toBe("Extra high");
+    expect(effortLabel("max")).toBe("Max");
+    expect(effortLabel("Off")).toBe("Off");
+    expect(effortLabel("on")).toBe("On");
+    expect(effortLabel(undefined)).toBe("");
   });
 });
 

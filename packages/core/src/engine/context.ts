@@ -21,7 +21,7 @@ export async function buildContext(
   const system = withSummary(options.system, session?.summary ?? null);
   const messages = history
     .filter((message) => !message.superseded)
-    .map(toLlmMessage)
+    .map((message) => toLlmMessage(message, options.includeReasoning === true))
     .filter((message): message is LlmMessage => message !== null);
   const budget = Math.max(options.maxTokens - estimateText(system), 1_000);
 
@@ -36,7 +36,7 @@ function withSummary(system: string, summary: string | null): string {
   return `${system}\n\nConversation summary so far:\n${clipped}`;
 }
 
-function toLlmMessage(message: MessageWithParts): LlmMessage | null {
+function toLlmMessage(message: MessageWithParts, includeReasoning: boolean): LlmMessage | null {
   if (message.role === "tool") {
     const results = message.parts
       .map(toolResultOf)
@@ -44,12 +44,18 @@ function toLlmMessage(message: MessageWithParts): LlmMessage | null {
     return results.length > 0 ? { role: "tool", parts: results } : null;
   }
 
+  const hasToolCalls = message.parts.some((part) => part.type === "tool_call");
   const parts: LlmPart[] = [];
   for (const part of message.parts) {
     if (part.type === "text") {
       const text = textOf(part);
       if (text) {
         parts.push({ type: "text", text });
+      }
+    } else if (part.type === "reasoning" && includeReasoning && hasToolCalls) {
+      const reasoning = reasoningOf(part);
+      if (reasoning) {
+        parts.push(reasoning);
       }
     } else if (part.type === "tool_call" && message.role === "assistant") {
       const call = toolCallOf(part);
@@ -95,12 +101,35 @@ function imageOf(part: Part): LlmPart | null {
   return { type: "image", mimeType: value.mimeType, data: value.data };
 }
 
+function reasoningOf(part: Part): LlmPart | null {
+  const data = part.data;
+  if (typeof data !== "object" || data === null) {
+    return null;
+  }
+  const value = data as { text?: unknown; signature?: unknown };
+  if (typeof value.text !== "string") {
+    return null;
+  }
+  return {
+    type: "reasoning",
+    text: value.text,
+    ...(typeof value.signature === "string" && value.signature.length > 0
+      ? { signature: value.signature }
+      : {}),
+  };
+}
+
 function toolCallOf(part: Part): LlmPart | null {
   const data = part.data;
   if (typeof data !== "object" || data === null) {
     return null;
   }
-  const value = data as { id?: unknown; name?: unknown; arguments?: unknown };
+  const value = data as {
+    id?: unknown;
+    name?: unknown;
+    arguments?: unknown;
+    thoughtSignature?: unknown;
+  };
   if (typeof value.id !== "string" || typeof value.name !== "string") {
     return null;
   }
@@ -109,6 +138,9 @@ function toolCallOf(part: Part): LlmPart | null {
     id: value.id,
     name: value.name,
     arguments: value.arguments,
+    ...(typeof value.thoughtSignature === "string" && value.thoughtSignature.length > 0
+      ? { thoughtSignature: value.thoughtSignature }
+      : {}),
   };
 }
 

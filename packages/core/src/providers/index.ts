@@ -7,6 +7,19 @@ export { createGoogleAdapter } from "./google";
 export { createOpenAiChatAdapter } from "./openaiChat";
 export { createOpenAiResponsesAdapter } from "./openaiResponses";
 export {
+  NO_REASONING,
+  alwaysOnReasoning,
+  assertReasoningRequest,
+  healReasoningCapabilities,
+  isReasoningEffort,
+  normalizeReasoningEffort,
+  openRouterReasoning,
+  reasoningCapabilities,
+  reasoningForPreset,
+  reasoningFromCatalog,
+  reasoningFromStoredEffort,
+} from "./reasoning";
+export {
   PRESETS,
   applyKnownCapabilities,
   createProviderConfig,
@@ -22,6 +35,7 @@ export type {
 } from "./registry";
 export { parseSse } from "./sse";
 export type { SseEvent } from "./sse";
+export { REASONING_EFFORTS } from "./types";
 export type {
   CompletionRequest,
   FetchInit,
@@ -37,5 +51,8 @@ export type {
   ProviderConfig,
   ProviderEvent,
   ProviderRuntime,
+  ReasoningCapabilities,
+  ReasoningEffort,
+  ReasoningRequest,
   ToolSchema,
 } from "./types";

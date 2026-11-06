@@ -69,6 +69,11 @@ function buildBody(request: CompletionRequest): Record<string, unknown> {
   if (request.temperature !== undefined) {
     generationConfig.temperature = request.temperature;
   }
+  if (request.reasoning.mode === "off") {
+    generationConfig.thinkingConfig = { thinkingBudget: 0 };
+  } else if (request.reasoning.effort) {
+    generationConfig.thinkingConfig = { thinkingLevel: request.reasoning.effort };
+  }
   const body: Record<string, unknown> = {
     contents: input.contents,
     generationConfig,

@@ -1,10 +1,13 @@
 import { createMessageRepository } from "../db";
 import type { DbContext, MessageWithParts, Part } from "../db";
+import { reasoningFromStoredEffort } from "../providers";
+import type { ReasoningRequest } from "../providers";
 
 export interface RegenerationTarget {
   /** `providerRowId:modelId`, as the picker and the turn port use it. */
   readonly selectionId: string;
   readonly effort: string;
+  readonly reasoning: ReasoningRequest;
   readonly text: string;
 }
 
@@ -40,6 +43,7 @@ export async function prepareRegeneration(
   return {
     selectionId: `${target.providerId}:${target.modelId}`,
     effort: target.effort ?? "Standard",
+    reasoning: reasoningFromStoredEffort(target.effort),
     text: textOf(user),
   };
 }
