@@ -147,6 +147,12 @@ describe("read tools", () => {
     expect(result.content).toContain("page three");
     expect(result.content).not.toContain("page one");
     expect(result.display).toBe("report.pdf · pages 2–3");
+    expect(result.citations?.map((citation) => citation.page)).toEqual([2, 3]);
+    expect(result.citations?.[0]).toMatchObject({
+      fileId: "report",
+      fileName: "report.pdf",
+      fileKind: "pdf",
+    });
   }));
 
   it("rejects a page range that is backwards", () => withContext(async (ctx) => {
@@ -230,6 +236,10 @@ describe("read tools", () => {
     expect(result.content).toContain("Budget!A4:C6");
     expect(result.content).not.toContain("Other!A1:B2");
     expect(result.display).toBe("budget.xlsx · Budget!A2:B5");
+    expect(result.citations?.map((citation) => citation.section)).toEqual([
+      "Budget!A1:C3",
+      "Budget!A4:C6",
+    ]);
   }));
 
   it("names the available sheets when the model guesses wrong", () => withContext(async (ctx) => {
@@ -280,6 +290,7 @@ describe("read tools", () => {
     expect(result.content).toContain("mine.pdf");
     expect(result.content).not.toContain("other.pdf");
     expect(result.display).toBe('"revenue" · 1 match');
+    expect(result.citations?.[0]?.fileId).toBe("mine-report");
   }));
 
   it("searches only a standalone chat's own files", () => withContext(async (ctx) => {

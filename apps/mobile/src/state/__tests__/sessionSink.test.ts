@@ -39,6 +39,22 @@ describe("session sink", () => {
     expect(store().streaming).toBe(false);
   });
 
+  it("collects citations from tool results without duplicating", () => {
+    const citation = {
+      fileId: "f1",
+      fileName: "report.pdf",
+      fileKind: "pdf" as const,
+      page: 2,
+      section: null,
+    };
+    sink.onUserTurn("user-1", "read it");
+    sink.onAssistantStart("assistant-1", true, 1);
+    sink.onCitations("assistant-1", [citation]);
+    sink.onCitations("assistant-1", [citation]);
+
+    expect(store().turns[1]?.citations).toEqual([citation]);
+  });
+
   it("keeps a multi-step turn on one row and adopts the final message id", () => {
     sink.onUserTurn("user-1", "read the report");
     sink.onAssistantStart("assistant-1", true, 1);

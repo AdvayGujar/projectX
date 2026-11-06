@@ -1,6 +1,7 @@
-import type { AttachmentChip, IconName, SourceRef } from "@projectx/ui";
+import type { AttachmentChip, CitationRef, CitationView, IconName, SourceRef } from "@projectx/ui";
 import {
   AttachmentViewer,
+  CitationSheet,
   ComposerNotice,
   ModelPickerSheet,
   SourcesSheet,
@@ -19,6 +20,7 @@ import { SessionActions } from "../../src/screens/session/SessionActions";
 import { SessionBody } from "../../src/screens/session/SessionBody";
 import { attachmentProblem, readImageAttachments } from "../../src/services/attachments";
 import { planAttachmentOpen } from "../../src/services/attachmentOpen";
+import { loadCitationSource } from "../../src/services/citationSource";
 import { ingestFile } from "../../src/services/documentIngest";
 import { describeError } from "../../src/services/errorMessage";
 import { openFileById } from "../../src/services/filePreview";
@@ -66,6 +68,7 @@ export default function SessionScreen(): ReactElement {
   const [attachments, setAttachments] = useState<readonly AttachmentChip[]>([]);
   const [notice, setNotice] = useState<{ message: string; icon: IconName } | null>(null);
   const [viewer, setViewer] = useState<LoadedAttachment | null>(null);
+  const [citationView, setCitationView] = useState<CitationView | null>(null);
 
   useEffect(() => {
     if (sessionId.length === 0 || activeSessionId === sessionId) {
@@ -258,6 +261,28 @@ export default function SessionScreen(): ReactElement {
     }
   }
 
+  async function openCitation(citation: CitationRef): Promise<void> {
+    setCitationView({ citation, text: null, loading: true });
+    try {
+      const source = await loadCitationSource(citation);
+      setCitationView({ citation: source.citation, text: source.text, loading: false });
+    } catch {
+      setCitationView(null);
+      setNotice({ message: "Could not open that citation.", icon: "attach" });
+    }
+  }
+
+  async function openCitationFile(citation: CitationRef): Promise<void> {
+    try {
+      await openFileById(citation.fileId);
+    } catch (failure) {
+      setNotice({
+        message: describeError(failure, "Could not open the cited file."),
+        icon: "attach",
+      });
+    }
+  }
+
   async function copyTurn(turnId: string): Promise<void> {
     const turn = turns.find((item) => item.id === turnId);
     if (!turn || turn.text.length === 0) {
@@ -319,6 +344,9 @@ export default function SessionScreen(): ReactElement {
         onOpenAttachment={(turnId, attachment) => {
           void openAttachment(turnId, attachment.index);
         }}
+        onOpenCitation={(citation) => {
+          void openCitation(citation);
+        }}
         onReadAloud={readAloud}
         onOpenSources={() => setSourcesOpen(true)}
       />
@@ -369,6 +397,14 @@ export default function SessionScreen(): ReactElement {
       />
 
       <SourcesSheet visible={sourcesOpen} sources={sources} onClose={() => setSourcesOpen(false)} />
+
+      <CitationSheet
+        view={citationView}
+        onClose={() => setCitationView(null)}
+        onOpenFile={(citation) => {
+          void openCitationFile(citation);
+        }}
+      />
 
       <AttachmentViewer attachment={viewer} onClose={() => setViewer(null)} />
 

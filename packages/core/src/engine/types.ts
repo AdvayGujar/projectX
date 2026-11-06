@@ -16,6 +16,7 @@ import type {
 } from "../tools";
 
 export type {
+  CitationRef,
   ToolCall,
   ToolExecutionContext,
   ToolExecutor,

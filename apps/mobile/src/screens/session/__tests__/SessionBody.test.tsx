@@ -15,6 +15,7 @@ function renderBody(turns: readonly ViewTurn[], error: string | null = null, str
       onCopy={noop}
       onRegenerate={noop}
       onOpenAttachment={noop}
+      onOpenCitation={noop}
       onReadAloud={noop}
       onOpenSources={noop}
     />,
@@ -92,6 +93,7 @@ describe("SessionBody", () => {
         onCopy={noop}
         onRegenerate={noop}
         onOpenAttachment={onOpenAttachment}
+        onOpenCitation={noop}
         onReadAloud={noop}
         onOpenSources={noop}
       />,
@@ -117,6 +119,7 @@ describe("SessionBody", () => {
         onCopy={onCopy}
         onRegenerate={noop}
         onOpenAttachment={noop}
+        onOpenCitation={noop}
         onReadAloud={noop}
         onOpenSources={noop}
       />,
@@ -174,6 +177,7 @@ describe("SessionBody", () => {
         onCopy={noop}
         onRegenerate={onRegenerate}
         onOpenAttachment={noop}
+        onOpenCitation={noop}
         onReadAloud={noop}
         onOpenSources={noop}
       />,
@@ -182,6 +186,78 @@ describe("SessionBody", () => {
     fireEvent.press(screen.getByLabelText("Regenerate"));
 
     expect(onRegenerate).toHaveBeenCalledWith("a1");
+  });
+
+  it("opens a citation chip from the answer", async () => {
+    const onOpenCitation = jest.fn();
+    const citation = {
+      fileId: "f1",
+      fileName: "report.pdf",
+      fileKind: "pdf" as const,
+      page: 2,
+      section: null,
+    };
+    await render(
+      <SessionBody
+        turns={[
+          {
+            id: "a1",
+            role: "assistant",
+            text: "Revenue grew (p.2).",
+            status: "done",
+            citations: [citation],
+          },
+        ]}
+        error={null}
+        streaming={false}
+        onCopy={noop}
+        onRegenerate={noop}
+        onOpenAttachment={noop}
+        onOpenCitation={onOpenCitation}
+        onReadAloud={noop}
+        onOpenSources={noop}
+      />,
+    );
+
+    fireEvent.press(screen.getByLabelText("Open source p.2"));
+
+    expect(onOpenCitation).toHaveBeenCalledWith(citation);
+  });
+
+  it("opens a citation inside bold text", async () => {
+    const onOpenCitation = jest.fn();
+    const citation = {
+      fileId: "f1",
+      fileName: "report.pdf",
+      fileKind: "pdf" as const,
+      page: 2,
+      section: null,
+    };
+    await render(
+      <SessionBody
+        turns={[
+          {
+            id: "a1",
+            role: "assistant",
+            text: "Revenue grew (**p.2**).",
+            status: "done",
+            citations: [citation],
+          },
+        ]}
+        error={null}
+        streaming={false}
+        onCopy={noop}
+        onRegenerate={noop}
+        onOpenAttachment={noop}
+        onOpenCitation={onOpenCitation}
+        onReadAloud={noop}
+        onOpenSources={noop}
+      />,
+    );
+
+    fireEvent.press(screen.getByLabelText("Open source p.2"));
+
+    expect(onOpenCitation).toHaveBeenCalledWith(citation);
   });
 
   it("prints the error inline", async () => {

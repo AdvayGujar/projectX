@@ -23,4 +23,4 @@ export function createReadTools(ctx: DbContext): ToolExecutor {
 
 /** Sent with the system prompt when the selected model supports tools. */
 export const READ_TOOL_GUIDANCE =
-  "Use the file tools when an answer depends on the user's documents. Call list_files to discover file ids, read only the pages or sections you need, and keep page, slide, and sheet references in the answer.";
+  "Use the file tools when an answer depends on the user's documents. Call list_files to discover file ids, read only the pages or sections you need, and cite the source inline as p.12, Slide 4, or Budget!B2.";

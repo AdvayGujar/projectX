@@ -90,6 +90,13 @@ describe("loadSession", () => {
           content: "Revenue grew.",
           display: "report.pdf · 2 pages",
           role: "read",
+          citations: [{
+            fileId: "f1",
+            fileName: "report.pdf",
+            fileKind: "pdf",
+            page: 2,
+            section: null,
+          }],
         },
       }],
     });
@@ -111,6 +118,13 @@ describe("loadSession", () => {
     expect(assistant?.activity).toEqual([
       { kind: "read", tool: "read_document", detail: "report.pdf · 2 pages" },
     ]);
+    expect(assistant?.citations).toEqual([{
+      fileId: "f1",
+      fileName: "report.pdf",
+      fileKind: "pdf",
+      page: 2,
+      section: null,
+    }]);
     expect(assistant?.cost?.tokens).toBe("10 in / 2 out");
   });
 });
