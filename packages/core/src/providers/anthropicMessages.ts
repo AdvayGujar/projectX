@@ -2,6 +2,7 @@ import type { LlmMessage, LlmPart } from "./types";
 
 export type AnthropicBlock =
   | { type: "text"; text: string }
+  | { type: "thinking"; thinking: string; signature: string }
   | { type: "image"; source: { type: "base64"; media_type: string; data: string } }
   | { type: "tool_use"; id: string; name: string; input: unknown }
   | { type: "tool_result"; tool_use_id: string; content: string; is_error?: boolean };
@@ -35,11 +36,15 @@ export function toAnthropicMessages(
     }
     if (message.role === "assistant") {
       const blocks: AnthropicBlock[] = [];
+      const toolCalls = message.parts.filter(isToolCall);
+      if (toolCalls.length > 0) {
+        blocks.push(...thinkingBlocks(message));
+      }
       const text = textOf(message);
       if (text) {
         blocks.push({ type: "text", text });
       }
-      for (const part of message.parts.filter(isToolCall)) {
+      for (const part of toolCalls) {
         blocks.push({ type: "tool_use", id: part.id, name: part.name, input: part.arguments });
       }
       pushMessage(result, "assistant", blocks);
@@ -85,6 +90,17 @@ function textOf(message: LlmMessage): string {
     .join("\n");
 }
 
+/** A thinking block without its signature is unusable and must not be replayed. */
+function thinkingBlocks(message: LlmMessage): AnthropicBlock[] {
+  const blocks: AnthropicBlock[] = [];
+  for (const part of message.parts.filter(isReasoning)) {
+    if (part.signature) {
+      blocks.push({ type: "thinking", thinking: part.text, signature: part.signature });
+    }
+  }
+  return blocks;
+}
+
 function toToolResult(part: Extract<LlmPart, { type: "tool_result" }>): AnthropicBlock {
   return {
     type: "tool_result",
@@ -104,6 +120,10 @@ function isImage(part: LlmPart): part is Extract<LlmPart, { type: "image" }> {
 
 function isToolCall(part: LlmPart): part is Extract<LlmPart, { type: "tool_call" }> {
   return part.type === "tool_call";
+}
+
+function isReasoning(part: LlmPart): part is Extract<LlmPart, { type: "reasoning" }> {
+  return part.type === "reasoning";
 }
 
 function isToolResult(part: LlmPart): part is Extract<LlmPart, { type: "tool_result" }> {

@@ -11,10 +11,27 @@ export interface ProviderConfig {
   headers?: Record<string, string>;
 }
 
+/** The reasoning effort levels a model can be asked for, in display order. */
+export const REASONING_EFFORTS = ["minimal", "low", "medium", "high", "xhigh", "max"] as const;
+export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
+
+export interface ReasoningCapabilities {
+  supported: boolean;
+  /** False means the model reasons whether the user wants it or not. */
+  canDisable: boolean;
+  /** Empty when the provider exposes no effort control for this model. */
+  efforts: ReasoningEffort[];
+}
+
+/** One neutral value that every adapter maps to its own dialect. */
+export type ReasoningRequest =
+  | { mode: "off" }
+  | { mode: "on"; effort?: ReasoningEffort };
+
 export interface ModelCapabilities {
   tools: boolean;
   vision: boolean;
-  reasoning: boolean;
+  reasoning: ReasoningCapabilities;
 }
 
 export interface ModelPricing {
@@ -41,7 +58,20 @@ export type LlmRole = "system" | "user" | "assistant" | "tool";
 export type LlmPart =
   | { type: "text"; text: string }
   | { type: "image"; mimeType: string; data: string }
-  | { type: "tool_call"; id: string; name: string; arguments: unknown }
+  | {
+    type: "reasoning";
+    text: string;
+    /** Anthropic thinking signature or Google thought signature, when the provider sent one. */
+    signature?: string;
+  }
+  | {
+    type: "tool_call";
+    id: string;
+    name: string;
+    arguments: unknown;
+    /** Google attaches a thought signature to the function call it must be replayed with. */
+    thoughtSignature?: string;
+  }
   | { type: "tool_result"; toolCallId: string; name: string; content: string; isError?: boolean };
 
 export interface LlmMessage {
@@ -62,6 +92,7 @@ export interface CompletionRequest {
   tools?: readonly ToolSchema[];
   temperature?: number;
   maxOutputTokens: number;
+  reasoning: ReasoningRequest;
   sessionId: string;
   signal?: AbortSignal;
 }
@@ -69,8 +100,10 @@ export interface CompletionRequest {
 export type ProviderEvent =
   | { type: "text_delta"; text: string }
   | { type: "reasoning_delta"; text: string }
+  | { type: "reasoning_signature"; signature: string }
   | { type: "tool_call_start"; id: string; name: string }
   | { type: "tool_call_delta"; id: string; argumentsJson: string }
+  | { type: "tool_call_signature"; id: string; signature: string }
   | { type: "tool_call_end"; id: string }
   | { type: "usage"; inputTokens: number; outputTokens: number; cachedTokens?: number }
   | { type: "done"; stopReason: "stop" | "tool_calls" | "length" | "error" }

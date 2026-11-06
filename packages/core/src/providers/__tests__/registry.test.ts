@@ -47,9 +47,9 @@ describe("provider registry", () => {
 
   it("merges fetched ids with known models", () => {
     const config = createProviderConfig("deepseek", { id: "deepseek-work" });
-    const models = mergeModels(config, ["deepseek-chat", "unknown-model"]);
+    const models = mergeModels(config, ["deepseek-flash", "unknown-model"]);
 
-    expect(models.map((model) => model.id)).toEqual(["deepseek-chat", "unknown-model"]);
+    expect(models.map((model) => model.id)).toEqual(["deepseek-flash", "unknown-model"]);
     expect(models[0]?.providerId).toBe("deepseek-work");
     expect(models[1]?.capabilities.tools).toBe(true);
   });
@@ -112,5 +112,27 @@ describe("provider registry", () => {
 
     expect(healed?.capabilities.vision).toBe(true);
     expect(unknown[0]?.capabilities.vision).toBe(false);
+  });
+
+  it("heals a boolean-only reasoning capability from curated truth", () => {
+    const curated = knownModels("deepseek")[0];
+    if (!curated) {
+      throw new Error("missing fixture model");
+    }
+    const stale = {
+      ...curated,
+      capabilities: {
+        ...curated.capabilities,
+        reasoning: { supported: true, canDisable: false, efforts: [] },
+      },
+    };
+
+    const [healed] = applyKnownCapabilities("deepseek", [stale]);
+
+    expect(healed?.capabilities.reasoning).toEqual({
+      supported: true,
+      canDisable: true,
+      efforts: ["low", "high", "max"],
+    });
   });
 });

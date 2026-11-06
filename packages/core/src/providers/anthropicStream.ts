@@ -18,11 +18,13 @@ interface AnthropicStreamEvent {
     id?: string;
     name?: string;
     input?: unknown;
+    thinking?: string;
   };
   delta?: {
     type?: string;
     text?: string;
     thinking?: string;
+    signature?: string;
     partial_json?: string;
     stop_reason?: string;
   };
@@ -90,6 +92,10 @@ function* startBlock(
   payload: AnthropicStreamEvent,
   tools: Map<number, ToolState>,
 ): Generator<ProviderEvent> {
+  if (payload.content_block?.type === "thinking" && payload.content_block.thinking) {
+    yield { type: "reasoning_delta", text: payload.content_block.thinking };
+    return;
+  }
   if (payload.content_block?.type !== "tool_use") {
     return;
   }
@@ -117,6 +123,10 @@ function* handleDelta(
   }
   if (delta?.type === "thinking_delta" && delta.thinking) {
     yield { type: "reasoning_delta", text: delta.thinking };
+    return;
+  }
+  if (delta?.type === "signature_delta" && delta.signature) {
+    yield { type: "reasoning_signature", signature: delta.signature };
     return;
   }
   if (delta?.type === "input_json_delta" && delta.partial_json) {

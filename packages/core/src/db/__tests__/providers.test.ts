@@ -11,7 +11,11 @@ const ANTHROPIC_MODEL: ModelInfo = {
   protocol: "anthropic",
   contextWindow: 200_000,
   maxOutput: 8_192,
-  capabilities: { tools: true, vision: true, reasoning: true },
+  capabilities: {
+    tools: true,
+    vision: true,
+    reasoning: { supported: true, canDisable: true, efforts: ["low", "medium", "high"] },
+  },
   pricing: { input: 3, output: 15 },
 };
 
@@ -86,6 +90,32 @@ describe("provider repository", () => {
     const models = await providers.listModels(created.id);
     expect(models.map((model) => model.id)).toEqual(["claude-sonnet-4-5"]);
     expect(models[0]?.capabilities.vision).toBe(true);
+  }));
+
+  it("loads a cached model whose reasoning was stored as a boolean", () => withContext(async (ctx) => {
+    const providers = createProviderRepository(ctx);
+    const created = await providers.add({
+      presetId: "anthropic",
+      label: "Anthropic",
+      protocol: "anthropic",
+      baseUrl: "https://api.anthropic.com",
+      keyRef: "key-4",
+    });
+    const legacy = {
+      ...ANTHROPIC_MODEL,
+      capabilities: { tools: true, vision: true, reasoning: true },
+    };
+    await ctx.db.execute(
+      "INSERT INTO models_cache (provider_id, model_id, json, fetched_at) VALUES (?, ?, ?, ?)",
+      [created.id, legacy.id, JSON.stringify(legacy), 1],
+    );
+
+    const [model] = await providers.listModels(created.id);
+    expect(model?.capabilities.reasoning).toEqual({
+      supported: true,
+      canDisable: false,
+      efforts: [],
+    });
   }));
 
   it("reports a missing provider", () => withContext(async (ctx) => {

@@ -1,5 +1,10 @@
 import { AppError } from "../errors";
-import type { ModelInfo, Protocol, ProviderConfig } from "./types";
+import {
+  alwaysOnReasoning,
+  healReasoningCapabilities,
+  reasoningForPreset,
+} from "./reasoning";
+import type { ModelInfo, Protocol, ProviderConfig, ReasoningCapabilities } from "./types";
 
 export interface ProviderPreset {
   id: string;
@@ -33,22 +38,30 @@ export const PRESETS: ProviderPreset[] = [
 
 const DEEPSEEK_MODELS: ModelInfo[] = [
   {
-    id: "deepseek-chat",
-    label: "DeepSeek Chat",
+    id: "deepseek-flash",
+    label: "DeepSeek Flash",
     providerId: "deepseek",
     protocol: "openai-chat",
     contextWindow: 128_000,
     maxOutput: 8_192,
-    capabilities: { tools: true, vision: false, reasoning: false },
+    capabilities: {
+      tools: true,
+      vision: true,
+      reasoning: reasoningForPreset("deepseek", "deepseek-flash"),
+    },
   },
   {
-    id: "deepseek-reasoner",
-    label: "DeepSeek Reasoner",
+    id: "deepseek-v4-pro",
+    label: "DeepSeek V4 Pro",
     providerId: "deepseek",
     protocol: "openai-chat",
     contextWindow: 128_000,
     maxOutput: 65_536,
-    capabilities: { tools: false, vision: false, reasoning: true },
+    capabilities: {
+      tools: true,
+      vision: false,
+      reasoning: reasoningForPreset("deepseek", "deepseek-v4-pro"),
+    },
   },
 ];
 
@@ -76,7 +89,9 @@ function goModel(
     capabilities: {
       tools: true,
       vision: options.vision ?? false,
-      reasoning: options.reasoning ?? false,
+      reasoning: options.reasoning
+        ? alwaysOnReasoning()
+        : reasoningForPreset("opencode-go", id),
     },
     endpoint,
   };
@@ -123,7 +138,11 @@ const ANTHROPIC_MODELS: ModelInfo[] = [
     protocol: "anthropic",
     contextWindow: 200_000,
     maxOutput: 8_192,
-    capabilities: { tools: true, vision: true, reasoning: true },
+    capabilities: {
+      tools: true,
+      vision: true,
+      reasoning: reasoningForPreset("anthropic", "claude-haiku-5-5"),
+    },
   },
 ];
 
@@ -135,7 +154,11 @@ const OPENAI_MODELS: ModelInfo[] = [
     protocol: "openai-responses",
     contextWindow: 272_000,
     maxOutput: 16_384,
-    capabilities: { tools: true, vision: true, reasoning: true },
+    capabilities: {
+      tools: true,
+      vision: true,
+      reasoning: reasoningForPreset("openai", "gpt-6-luna"),
+    },
   },
 ];
 
@@ -147,7 +170,11 @@ const GOOGLE_MODELS: ModelInfo[] = [
     protocol: "google",
     contextWindow: 1_000_000,
     maxOutput: 8_192,
-    capabilities: { tools: true, vision: true, reasoning: true },
+    capabilities: {
+      tools: true,
+      vision: true,
+      reasoning: reasoningForPreset("google", "gemini-4-argon"),
+    },
   },
 ];
 
@@ -200,7 +227,7 @@ export interface FetchedModelInfo {
   readonly label?: string;
   readonly vision?: boolean;
   readonly tools?: boolean;
-  readonly reasoning?: boolean;
+  readonly reasoning?: ReasoningCapabilities;
   readonly contextWindow?: number;
   readonly maxOutput?: number;
 }
@@ -262,7 +289,10 @@ export function applyKnownCapabilities(
       capabilities: {
         tools: model.capabilities.tools || curated.capabilities.tools,
         vision: model.capabilities.vision || curated.capabilities.vision,
-        reasoning: model.capabilities.reasoning || curated.capabilities.reasoning,
+        reasoning: healReasoningCapabilities(
+          model.capabilities.reasoning,
+          curated.capabilities.reasoning,
+        ),
       },
     };
   });
@@ -276,6 +306,10 @@ function defaultModel(config: ProviderConfig, id: string): ModelInfo {
     protocol: config.protocol,
     contextWindow: DEFAULT_CONTEXT_WINDOW,
     maxOutput: DEFAULT_MAX_OUTPUT,
-    capabilities: { tools: true, vision: false, reasoning: false },
+    capabilities: {
+      tools: true,
+      vision: false,
+      reasoning: reasoningForPreset(config.presetId, id),
+    },
   };
 }

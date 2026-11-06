@@ -6,6 +6,7 @@ import type {
   ModelInfo,
   ProviderAdapter,
   ProviderRuntime,
+  ReasoningRequest,
   ToolSchema,
 } from "../providers";
 import type {
@@ -53,7 +54,9 @@ export interface RunTurnOptions {
   maxOutputTokens: number;
   temperature?: number;
   maxSteps?: number;
-  /** Reasoning effort the user chose for this turn, stored with the assistant message. */
+  /** Reasoning control for this turn. Omitted means reasoning is off. */
+  reasoning?: ReasoningRequest;
+  /** Reasoning effort label stored with the assistant message. */
   effort?: string;
   signal?: AbortSignal;
   onEvent?: (event: TurnEvent) => void;
@@ -85,6 +88,8 @@ export interface ContextOptions {
   system: string;
   maxTokens: number;
   messageLimit?: number;
+  /** Reasoning history is only replayed when the current turn has reasoning on. */
+  includeReasoning?: boolean;
 }
 
 export interface BuiltContext {

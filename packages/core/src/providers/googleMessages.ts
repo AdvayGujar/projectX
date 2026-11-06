@@ -3,7 +3,7 @@ import type { LlmMessage, LlmPart, ToolSchema } from "./types";
 type GooglePart =
   | { text: string }
   | { inlineData: { mimeType: string; data: string } }
-  | { functionCall: { name: string; args: unknown } }
+  | { functionCall: { name: string; args: unknown }; thoughtSignature?: string }
   | { functionResponse: { name: string; response: { content: string; isError?: boolean } } };
 
 export interface GoogleContent {
@@ -113,7 +113,10 @@ function assistantParts(message: LlmMessage): GooglePart[] {
     parts.push({ text });
   }
   for (const part of message.parts.filter(isToolCall)) {
-    parts.push({ functionCall: { name: part.name, args: part.arguments ?? {} } });
+    parts.push({
+      functionCall: { name: part.name, args: part.arguments ?? {} },
+      ...(part.thoughtSignature ? { thoughtSignature: part.thoughtSignature } : {}),
+    });
   }
   return parts;
 }

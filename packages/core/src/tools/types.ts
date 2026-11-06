@@ -12,6 +12,8 @@ export interface ToolCall {
   name: string;
   arguments: unknown;
   role?: ToolRole;
+  /** Google requires the thought signature to be replayed with the call. */
+  thoughtSignature?: string;
 }
 
 /** A tool result. `display` is the short line the Thought disclosure shows. */

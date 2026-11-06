@@ -15,10 +15,20 @@ export type OpenAiMessage =
     role: "system" | "user" | "assistant";
     content: string | OpenAiContentPart[] | null;
     tool_calls?: OpenAiToolCall[];
+    reasoning_content?: string;
   }
   | { role: "tool"; tool_call_id: string; content: string };
 
-export function toOpenAiMessages(system: string, messages: LlmMessage[]): OpenAiMessage[] {
+export interface OpenAiMessageOptions {
+  /** DeepSeek and Kimi reject a tool loop whose assistant message lost its reasoning. */
+  readonly includeReasoningContent?: boolean;
+}
+
+export function toOpenAiMessages(
+  system: string,
+  messages: LlmMessage[],
+  options: OpenAiMessageOptions = {},
+): OpenAiMessage[] {
   const result: OpenAiMessage[] = [];
   if (system.trim()) {
     result.push({ role: "system", content: system });
@@ -28,7 +38,7 @@ export function toOpenAiMessages(system: string, messages: LlmMessage[]): OpenAi
       result.push(...toolResults(message));
       continue;
     }
-    appendConversationMessage(result, message, message.role);
+    appendConversationMessage(result, message, message.role, options);
   }
   return result;
 }
@@ -37,14 +47,19 @@ function appendConversationMessage(
   result: OpenAiMessage[],
   message: LlmMessage,
   role: "system" | "user" | "assistant",
+  options: OpenAiMessageOptions,
 ): void {
   const text = message.parts.filter(isText).map((part) => part.text).join("\n");
   if (role === "assistant") {
     const toolCalls = message.parts.filter(isToolCall).map(toToolCall);
+    const reasoning = toolCalls.length > 0 && options.includeReasoningContent
+      ? message.parts.filter(isReasoning).map((part) => part.text).join("\n")
+      : "";
     if (text || toolCalls.length > 0) {
       result.push({
         role: "assistant",
         content: text || null,
+        ...(reasoning ? { reasoning_content: reasoning } : {}),
         ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
       });
     }
@@ -99,6 +114,10 @@ function isImage(part: LlmPart): part is Extract<LlmPart, { type: "image" }> {
 
 function isToolCall(part: LlmPart): part is Extract<LlmPart, { type: "tool_call" }> {
   return part.type === "tool_call";
+}
+
+function isReasoning(part: LlmPart): part is Extract<LlmPart, { type: "reasoning" }> {
+  return part.type === "reasoning";
 }
 
 function isToolResult(part: LlmPart): part is Extract<LlmPart, { type: "tool_result" }> {

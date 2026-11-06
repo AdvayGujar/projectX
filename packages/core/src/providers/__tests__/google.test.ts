@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createGoogleAdapter } from "../google";
 import { toGoogleContents, toGoogleTools } from "../googleMessages";
 import { knownModels } from "../registry";
-import type { FetchInit, FetchLike, ModelInfo } from "../types";
+import type { FetchInit, FetchLike, ModelInfo, ReasoningRequest } from "../types";
 import { collect, data, requestFor, runtimeFor, sseResponse } from "./helpers";
 
 function fixtureModel(id = "gemini-4-argon"): ModelInfo {
@@ -38,6 +38,28 @@ describe("google contents conversion", () => {
     });
     expect(result.contents[2]?.parts[0]).toMatchObject({
       functionResponse: { name: "read_document", response: { content: "page one" } },
+    });
+  });
+
+  it("keeps a Google thought signature on the function call it belongs to", () => {
+    const result = toGoogleContents("System", [
+      {
+        role: "assistant",
+        parts: [
+          {
+            type: "tool_call",
+            id: "call_1",
+            name: "read_document",
+            arguments: { page: 1 },
+            thoughtSignature: "sig-1",
+          },
+        ],
+      },
+    ]);
+
+    expect(result.contents[0]?.parts[0]).toEqual({
+      functionCall: { name: "read_document", args: { page: 1 } },
+      thoughtSignature: "sig-1",
     });
   });
 
@@ -126,6 +148,37 @@ describe("google adapter", () => {
     expect(events.at(-1)).toEqual({ type: "done", stopReason: "tool_calls" });
   });
 
+  it("emits a thought signature alongside the function call", async () => {
+    const fetchImpl: FetchLike = async () => sseResponse([
+      data({
+        candidates: [{
+          content: {
+            parts: [{
+              functionCall: { name: "read_document", args: { page: 1 } },
+              thoughtSignature: "sig-1",
+            }],
+          },
+          finishReason: "STOP",
+        }],
+      }),
+    ]);
+    const events = await collect(
+      createGoogleAdapter(),
+      requestFor(fixtureModel()),
+      runtimeFor(fetchImpl, "google"),
+    );
+
+    expect(events).toContainEqual({ type: "tool_call_signature", id: "call_0", signature: "sig-1" });
+  });
+
+  it("maps thinking off and effort to thinkingConfig", async () => {
+    const on = await captureBody({ mode: "on", effort: "medium" });
+    expect(thinkingConfig(on)).toEqual({ thinkingLevel: "medium" });
+
+    const off = await captureBody({ mode: "off" });
+    expect(thinkingConfig(off)).toEqual({ thinkingBudget: 0 });
+  });
+
   it("sends the Google key header and the Go endpoint", async () => {
     let url = "";
     let init: FetchInit | undefined;
@@ -161,3 +214,21 @@ describe("google adapter", () => {
     ).rejects.toMatchObject({ code: "provider_auth" });
   });
 });
+
+async function captureBody(reasoning: ReasoningRequest): Promise<Record<string, unknown>> {
+  let body: Record<string, unknown> = {};
+  const fetchImpl: FetchLike = async (_url, init) => {
+    body = JSON.parse(init?.body ?? "{}") as Record<string, unknown>;
+    return sseResponse([data({ candidates: [{ content: { parts: [] }, finishReason: "STOP" }] })]);
+  };
+  await collect(
+    createGoogleAdapter(),
+    requestFor(fixtureModel(), { reasoning }),
+    runtimeFor(fetchImpl, "google"),
+  );
+  return body;
+}
+
+function thinkingConfig(body: Record<string, unknown>): unknown {
+  return (body.generationConfig as Record<string, unknown> | undefined)?.thinkingConfig;
+}
