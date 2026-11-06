@@ -15,6 +15,15 @@ export interface SourceRef {
   readonly domain: string;
 }
 
+/** A page, slide, or section the assistant actually read. */
+export interface CitationRef {
+  readonly fileId: string;
+  readonly fileName: string;
+  readonly fileKind: "pdf" | "docx" | "xlsx" | "pptx" | "image" | "text" | "other";
+  readonly page: number | null;
+  readonly section: string | null;
+}
+
 export interface TurnCost {
   readonly model: string;
   readonly effort?: string;
@@ -50,6 +59,7 @@ export interface ViewTurn {
   readonly reasoning?: string;
   readonly activity?: readonly ToolActivity[];
   readonly artifact?: TurnArtifact;
+  readonly citations?: readonly CitationRef[];
   readonly sources?: readonly SourceRef[];
   readonly cost?: TurnCost;
 }

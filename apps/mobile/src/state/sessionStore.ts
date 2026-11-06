@@ -1,4 +1,5 @@
-import type { ToolActivity, TurnCost, ViewTurn } from "@projectx/ui";
+import { mergeCitations } from "@projectx/core";
+import type { CitationRef, ToolActivity, TurnCost, ViewTurn } from "@projectx/ui";
 import { create } from "zustand";
 
 export interface SessionUsage {
@@ -39,6 +40,7 @@ interface SessionState {
   readonly appendText: (id: string, text: string) => void;
   readonly appendReasoning: (id: string, text: string) => void;
   readonly addActivity: (id: string, activity: ToolActivity) => void;
+  readonly addCitations: (id: string, citations: readonly CitationRef[]) => void;
   readonly setCost: (id: string, cost: TurnCost) => void;
   readonly adoptTurnId: (fromId: string, toId: string) => void;
   readonly settleStreaming: () => void;
@@ -104,6 +106,14 @@ export const useSessionStore = create<SessionState>((set) => ({
       turns: update(state.turns, id, (turn) => ({
         ...turn,
         activity: [...(turn.activity ?? []), activity],
+      })),
+    })),
+
+  addCitations: (id, citations) =>
+    set((state) => ({
+      turns: update(state.turns, id, (turn) => ({
+        ...turn,
+        citations: mergeCitations(turn.citations ?? [], citations),
       })),
     })),
 

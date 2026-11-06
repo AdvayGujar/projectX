@@ -20,7 +20,7 @@ import type {
   ProviderRuntime,
 } from "@projectx/core";
 
-import type { ToolActivity, TurnAttachment } from "@projectx/ui";
+import type { CitationRef, ToolActivity, TurnAttachment } from "@projectx/ui";
 
 import type { ImageAttachment } from "./attachments";
 
@@ -51,6 +51,7 @@ export interface TurnSink {
   onText(id: string, text: string): void;
   onReasoning(id: string, text: string): void;
   onToolActivity(id: string, activity: ToolActivity): void;
+  onCitations(id: string, citations: readonly CitationRef[]): void;
   onUsage(id: string, usage: TurnUsage): void;
   /** Receives the final assistant message id so a multi-step turn can adopt it. */
   onTurnFinished(id: string | null): void;
@@ -166,6 +167,9 @@ export function createTurnPort(sink: TurnSink): TurnPort {
                 tool: event.result.name,
                 detail: event.result.display ?? event.result.name,
               });
+              if (event.result.citations && event.result.citations.length > 0) {
+                sink.onCitations(event.assistantMessageId, event.result.citations);
+              }
               break;
             case "turn_finished":
               sink.onTurnFinished(event.messageId);

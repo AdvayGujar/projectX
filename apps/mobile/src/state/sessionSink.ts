@@ -61,6 +61,10 @@ export function createSessionStoreSink(): TurnSink {
       useSessionStore.getState().addActivity(viewOf(id), activity);
     },
 
+    onCitations: (id, citations) => {
+      useSessionStore.getState().addCitations(viewOf(id), citations);
+    },
+
     onUsage: (id, usage) => {
       const viewId = viewOf(id);
       const total = accumulate(viewId, usage);

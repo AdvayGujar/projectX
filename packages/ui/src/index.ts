@@ -75,6 +75,12 @@ export type { SessionHeaderProps } from "./session/SessionHeader";
 export { SessionMenu } from "./session/SessionMenu";
 export type { SessionMenuProps } from "./session/SessionMenu";
 
+export { CitationChips } from "./session/CitationChips";
+export type { CitationChipsProps } from "./session/CitationChips";
+
+export { CitationSheet } from "./session/CitationSheet";
+export type { CitationSheetProps, CitationView } from "./session/CitationSheet";
+
 export { SourcesSheet } from "./session/SourcesSheet";
 export type { SourcesSheetProps } from "./session/SourcesSheet";
 
@@ -92,6 +98,7 @@ export { colors, HIT_SLOP, monoFont, radius, space, typography } from "./theme";
 export { REASONING_EFFORTS } from "./types";
 export type {
   AttachmentChip,
+  CitationRef,
   DrawerDestination,
   ModelOption,
   ReasoningEffort,

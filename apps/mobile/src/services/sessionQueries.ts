@@ -1,4 +1,5 @@
-import type { ModelPricing, RegenerationTarget, ToolRole } from "@projectx/core";
+import { mergeCitations } from "@projectx/core";
+import type { CitationRef, ModelPricing, RegenerationTarget, ToolRole } from "@projectx/core";
 import {
   createMessageRepository,
   createProviderRepository,
@@ -168,6 +169,7 @@ interface StoredToolResult {
   readonly name: string;
   readonly role: ToolRole;
   readonly detail: string;
+  readonly citations: readonly CitationRef[];
 }
 
 interface StoredToolCall {
@@ -252,6 +254,7 @@ function assistantTurn(
     .filter(Boolean)
     .join("\n\n");
   const activity = activityOf(run, results);
+  const citations = citationsOf(results);
   const cost = costOfRun(run, prices);
 
   return {
@@ -260,8 +263,17 @@ function assistantTurn(
     text,
     ...(reasoning.length > 0 ? { reasoning } : {}),
     ...(activity.length > 0 ? { activity } : {}),
+    ...(citations.length > 0 ? { citations } : {}),
     ...(cost ? { cost } : {}),
   };
+}
+
+function citationsOf(results: ReadonlyMap<string, StoredToolResult>): CitationRef[] {
+  let citations: CitationRef[] = [];
+  for (const result of results.values()) {
+    citations = mergeCitations(citations, result.citations);
+  }
+  return citations;
 }
 
 function activityOf(
@@ -334,6 +346,7 @@ function storedToolResult(
     name?: unknown;
     role?: unknown;
     display?: unknown;
+    citations?: unknown;
   };
   if (typeof value.toolCallId !== "string" || typeof value.name !== "string") {
     return null;
@@ -343,7 +356,54 @@ function storedToolResult(
     name: value.name,
     role: toRole(value.role),
     detail: typeof value.display === "string" ? value.display : value.name,
+    citations: storedCitations(value.citations),
   };
+}
+
+function storedCitations(value: unknown): CitationRef[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const citations: CitationRef[] = [];
+  for (const item of value) {
+    if (typeof item !== "object" || item === null) {
+      continue;
+    }
+    const citation = item as {
+      fileId?: unknown;
+      fileName?: unknown;
+      fileKind?: unknown;
+      page?: unknown;
+      section?: unknown;
+    };
+    if (
+      typeof citation.fileId !== "string" ||
+      typeof citation.fileName !== "string" ||
+      !isCitationKind(citation.fileKind)
+    ) {
+      continue;
+    }
+    citations.push({
+      fileId: citation.fileId,
+      fileName: citation.fileName,
+      fileKind: citation.fileKind,
+      page: typeof citation.page === "number" ? citation.page : null,
+      section: typeof citation.section === "string" ? citation.section : null,
+    });
+  }
+  return citations;
+}
+
+function isCitationKind(value: unknown): value is CitationRef["fileKind"] {
+  return (
+    value === "pdf" ||
+    value === "docx" ||
+    value === "xlsx" ||
+    value === "pptx" ||
+    value === "image" ||
+    value === "text" ||
+    value === "other"
+  );
 }
 
 function toRole(value: unknown): ToolRole {

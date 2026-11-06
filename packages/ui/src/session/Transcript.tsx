@@ -5,8 +5,10 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Icon } from "../icons";
 import { colors, HIT_SLOP, radius, space, typography } from "../theme";
-import type { SourceRef, TurnAttachment, ViewTurn } from "../types";
+import type { CitationRef, SourceRef, TurnAttachment, ViewTurn } from "../types";
 import { Markdown } from "../markdown/Markdown";
+import { CitationChips } from "./CitationChips";
+import { citedCitations } from "./citations";
 import { costLine, streamingLabel, summarise } from "./format";
 import { Thought } from "./Thought";
 
@@ -15,6 +17,7 @@ export interface TranscriptProps {
   readonly onCopy: (turnId: string) => void;
   readonly onRegenerate: (turnId: string) => void;
   readonly onOpenAttachment: (turnId: string, attachment: TurnAttachment) => void;
+  readonly onOpenCitation: (citation: CitationRef) => void;
   readonly onReadAloud: (turnId: string) => void;
   readonly onOpenSources: (turnId: string) => void;
   /** Reports each row's offset so a search result can scroll the transcript to it. */
@@ -28,6 +31,7 @@ export function Transcript({
   onCopy,
   onRegenerate,
   onOpenAttachment,
+  onOpenCitation,
   onReadAloud,
   onOpenSources,
   onTurnLayout,
@@ -91,6 +95,11 @@ export function Transcript({
             ) : null}
 
             {turn.text.length > 0 ? <Markdown text={turn.text} /> : null}
+
+            <CitationChips
+              citations={citedCitations(turn.text, turn.citations ?? [])}
+              onOpenCitation={onOpenCitation}
+            />
 
             {turn.status === "streaming" ? null : (
               <Actions
