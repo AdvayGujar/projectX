@@ -67,6 +67,8 @@ function props(overrides: Partial<Parameters<typeof ProjectLibraryPanel>[0]> = {
     busy: false,
     onAddFile: () => undefined,
     onAddLink: () => undefined,
+    onOpenFile: () => undefined,
+    onOpenLink: () => undefined,
     onRemoveFile: () => undefined,
     onRemoveLink: () => undefined,
     ...overrides,
@@ -91,14 +93,35 @@ describe("ProjectLibraryPanel", () => {
     expect(screen.getByText("That site returned HTTP 404.")).toBeTruthy();
   });
 
+  it("opens a file row and a link row", async () => {
+    const onOpenFile = jest.fn();
+    const onOpenLink = jest.fn();
+    await render(<ProjectLibraryPanel {...props({ onOpenFile, onOpenLink })} />);
+
+    await fireEvent.press(screen.getByLabelText("Open report.pdf"));
+    await fireEvent.press(screen.getByLabelText("Open Bridge report"));
+
+    expect(onOpenFile).toHaveBeenCalledWith(FILE);
+    expect(onOpenLink).toHaveBeenCalledWith(FAILED_LINK);
+  });
+
   it("calls the add and remove actions", async () => {
     const onAddFile = jest.fn();
     const onAddLink = jest.fn();
+    const onOpenFile = jest.fn();
+    const onOpenLink = jest.fn();
     const onRemoveFile = jest.fn();
     const onRemoveLink = jest.fn();
     await render(
       <ProjectLibraryPanel
-        {...props({ onAddFile, onAddLink, onRemoveFile, onRemoveLink })}
+        {...props({
+          onAddFile,
+          onAddLink,
+          onOpenFile,
+          onOpenLink,
+          onRemoveFile,
+          onRemoveLink,
+        })}
       />,
     );
 
@@ -109,6 +132,8 @@ describe("ProjectLibraryPanel", () => {
 
     expect(onAddFile).toHaveBeenCalledTimes(1);
     expect(onAddLink).toHaveBeenCalledTimes(1);
+    expect(onOpenFile).not.toHaveBeenCalled();
+    expect(onOpenLink).not.toHaveBeenCalled();
     expect(onRemoveFile).toHaveBeenCalledWith(FILE);
     expect(onRemoveLink).toHaveBeenCalledWith(FAILED_LINK);
   });

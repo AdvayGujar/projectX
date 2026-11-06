@@ -105,6 +105,8 @@ export interface LoadedAttachment {
   readonly mimeType: string;
   readonly kind: "image" | "document";
   readonly base64: string | null;
+  /** Stored file id for a document part; images live only in the message payload. */
+  readonly fileId: string | null;
 }
 
 /** Reads one attachment's bytes only when the user taps its chip. */
@@ -125,7 +127,13 @@ export async function loadAttachment(
   if (typeof data !== "object" || data === null) {
     return null;
   }
-  const value = data as { name?: unknown; mimeType?: unknown; kind?: unknown; data?: unknown };
+  const value = data as {
+    name?: unknown;
+    mimeType?: unknown;
+    kind?: unknown;
+    data?: unknown;
+    fileId?: unknown;
+  };
   if (typeof value.name !== "string") {
     return null;
   }
@@ -134,6 +142,7 @@ export async function loadAttachment(
     mimeType: typeof value.mimeType === "string" ? value.mimeType : "application/octet-stream",
     kind: value.kind === "image" ? "image" : "document",
     base64: typeof value.data === "string" ? value.data : null,
+    fileId: typeof value.fileId === "string" ? value.fileId : null,
   };
 }
 

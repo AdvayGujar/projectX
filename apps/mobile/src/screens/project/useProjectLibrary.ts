@@ -1,7 +1,10 @@
+import type { FileRecord, ProjectLink } from "@projectx/core";
 import * as DocumentPicker from "expo-document-picker";
 import { useCallback, useState } from "react";
+import { Linking } from "react-native";
 
 import { describeError } from "../../services/errorMessage";
+import { openStoredFile } from "../../services/filePreview";
 import type { ProjectLibraryItem } from "../../services/projectLibraryService";
 import {
   addProjectFile,
@@ -27,8 +30,10 @@ export interface ProjectLibraryController {
   readonly removal: LibraryRemoval | null;
   readonly setItems: (items: readonly ProjectLibraryItem[]) => void;
   addFile(): Promise<void>;
-  openLink(): void;
-  closeLink(): void;
+  openFile(file: FileRecord): Promise<void>;
+  openLink(link: ProjectLink): Promise<void>;
+  openLinkDialog(): void;
+  closeLinkDialog(): void;
   submitLink(url: string): Promise<void>;
   requestRemoval(item: ProjectLibraryItem): void;
   cancelRemoval(): void;
@@ -76,12 +81,30 @@ export function useProjectLibrary(projectId: string): ProjectLibraryController {
     }
   }, [projectId, refresh]);
 
-  const openLink = useCallback((): void => {
+  const openFile = useCallback(async (file: FileRecord): Promise<void> => {
+    setNotice(null);
+    try {
+      await openStoredFile(file.path, file.mime);
+    } catch (failure) {
+      setNotice(describeError(failure, "Could not open that file."));
+    }
+  }, []);
+
+  const openLink = useCallback(async (link: ProjectLink): Promise<void> => {
+    setNotice(null);
+    try {
+      await Linking.openURL(link.url);
+    } catch (failure) {
+      setNotice(describeError(failure, "Could not open that link."));
+    }
+  }, []);
+
+  const openLinkDialog = useCallback((): void => {
     setLinkError(null);
     setLinkOpen(true);
   }, []);
 
-  const closeLink = useCallback((): void => {
+  const closeLinkDialog = useCallback((): void => {
     setLinkOpen(false);
     setLinkError(null);
   }, []);
@@ -146,8 +169,10 @@ export function useProjectLibrary(projectId: string): ProjectLibraryController {
     removal,
     setItems,
     addFile,
+    openFile,
     openLink,
-    closeLink,
+    openLinkDialog,
+    closeLinkDialog,
     submitLink,
     requestRemoval,
     cancelRemoval,

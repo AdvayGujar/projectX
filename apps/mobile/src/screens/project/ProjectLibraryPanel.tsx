@@ -25,6 +25,8 @@ export interface ProjectLibraryPanelProps {
   readonly busy: boolean;
   readonly onAddFile: () => void;
   readonly onAddLink: () => void;
+  readonly onOpenFile: (file: FileRecord) => void;
+  readonly onOpenLink: (link: ProjectLink) => void;
   readonly onRemoveFile: (file: FileRecord) => void;
   readonly onRemoveLink: (link: ProjectLink) => void;
 }
@@ -35,6 +37,8 @@ export function ProjectLibraryPanel({
   busy,
   onAddFile,
   onAddLink,
+  onOpenFile,
+  onOpenLink,
   onRemoveFile,
   onRemoveLink,
 }: ProjectLibraryPanelProps): ReactElement {
@@ -75,9 +79,9 @@ export function ProjectLibraryPanel({
           keyExtractor={itemKey}
           renderItem={({ item }) =>
             item.kind === "file" ? (
-              <FileRow file={item.file} onRemove={onRemoveFile} />
+              <FileRow file={item.file} onOpen={onOpenFile} onRemove={onRemoveFile} />
             ) : (
-              <LinkRow link={item.link} onRemove={onRemoveLink} />
+              <LinkRow link={item.link} onOpen={onOpenLink} onRemove={onRemoveLink} />
             )
           }
           contentContainerStyle={styles.listContent}
@@ -89,25 +93,34 @@ export function ProjectLibraryPanel({
 
 function FileRow({
   file,
+  onOpen,
   onRemove,
 }: {
   readonly file: FileRecord;
+  readonly onOpen: (file: FileRecord) => void;
   readonly onRemove: (file: FileRecord) => void;
 }): ReactElement {
   const meta = `${KIND_LABELS[file.kind]} · ${formatSize(file.size)}`;
   return (
     <View style={styles.row}>
-      <View style={styles.icon}>
-        <Icon name={iconForFile(file.kind)} size={17} color={colors.textMuted} />
-      </View>
-      <View style={styles.rowText}>
-        <Text style={styles.title} numberOfLines={1}>
-          {file.name}
-        </Text>
-        <Text style={styles.meta} numberOfLines={1}>
-          {meta}
-        </Text>
-      </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Open ${file.name}`}
+        onPress={() => onOpen(file)}
+        style={styles.rowMain}
+      >
+        <View style={styles.icon}>
+          <Icon name={iconForFile(file.kind)} size={17} color={colors.textMuted} />
+        </View>
+        <View style={styles.rowText}>
+          <Text style={styles.title} numberOfLines={1}>
+            {file.name}
+          </Text>
+          <Text style={styles.meta} numberOfLines={1}>
+            {meta}
+          </Text>
+        </View>
+      </Pressable>
       <RemoveButton label={`Remove ${file.name}`} onPress={() => onRemove(file)} />
     </View>
   );
@@ -115,31 +128,40 @@ function FileRow({
 
 function LinkRow({
   link,
+  onOpen,
   onRemove,
 }: {
   readonly link: ProjectLink;
+  readonly onOpen: (link: ProjectLink) => void;
   readonly onRemove: (link: ProjectLink) => void;
 }): ReactElement {
   const status = statusText(link);
   return (
     <View style={styles.row}>
-      <View style={styles.icon}>
-        <Icon name="search" size={17} color={colors.textMuted} />
-      </View>
-      <View style={styles.rowText}>
-        <Text style={styles.title} numberOfLines={1}>
-          {link.title}
-        </Text>
-        <Text style={styles.meta} numberOfLines={1}>
-          {hostOf(link.url)}
-        </Text>
-        <Text
-          style={[styles.status, link.status === "error" ? styles.statusError : undefined]}
-          numberOfLines={2}
-        >
-          {status}
-        </Text>
-      </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Open ${link.title}`}
+        onPress={() => onOpen(link)}
+        style={styles.rowMain}
+      >
+        <View style={styles.icon}>
+          <Icon name="search" size={17} color={colors.textMuted} />
+        </View>
+        <View style={styles.rowText}>
+          <Text style={styles.title} numberOfLines={1}>
+            {link.title}
+          </Text>
+          <Text style={styles.meta} numberOfLines={1}>
+            {hostOf(link.url)}
+          </Text>
+          <Text
+            style={[styles.status, link.status === "error" ? styles.statusError : undefined]}
+            numberOfLines={2}
+          >
+            {status}
+          </Text>
+        </View>
+      </Pressable>
       <RemoveButton label={`Remove ${link.title}`} onPress={() => onRemove(link)} />
     </View>
   );
@@ -237,6 +259,13 @@ const styles = StyleSheet.create({
     paddingVertical: space.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: "rgba(255,255,255,0.08)",
+  },
+  rowMain: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.md,
+    minHeight: 44,
   },
   icon: {
     width: 34,
