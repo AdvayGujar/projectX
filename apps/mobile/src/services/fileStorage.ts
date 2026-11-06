@@ -28,6 +28,10 @@ export function createAppFileStorage(): FileStoragePort {
       return { size: file.size };
     },
 
+    uriFor(relativePath) {
+      return joinUnderRoot(DOCUMENTS_ROOT, relativePath);
+    },
+
     async remove(relativePath) {
       const file = new File(joinUnderRoot(DOCUMENTS_ROOT, relativePath));
       if (file.exists) {

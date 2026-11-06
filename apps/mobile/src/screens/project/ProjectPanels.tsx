@@ -30,7 +30,7 @@ export function ProjectSessionsPanel({
   );
 }
 
-/** Files, memory and artifacts are owned by later milestones; the tab explains which. */
+/** Memory and artifacts are owned by later milestones; the tab explains which. */
 export function PlaceholderPanel({ tab }: { readonly tab: ProjectTabKey }): ReactElement {
   return (
     <View style={styles.placeholder}>
@@ -40,13 +40,13 @@ export function PlaceholderPanel({ tab }: { readonly tab: ProjectTabKey }): Reac
 }
 
 function placeholderFor(tab: ProjectTabKey): string {
-  if (tab === "files") {
-    return "Project files arrive with the library (M2.3b).";
-  }
   if (tab === "memory") {
     return "Project memory arrives with memory v1 (M5).";
   }
-  return "Project artifacts arrive with the artifact canvas (M4).";
+  if (tab === "artifacts") {
+    return "Project artifacts arrive with the artifact canvas (M4).";
+  }
+  return "The project library is ready.";
 }
 
 const styles = StyleSheet.create({

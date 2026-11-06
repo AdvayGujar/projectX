@@ -19,6 +19,7 @@ interface FakeStorage {
   writeText(relativePath: string, text: string): Promise<{ size: number }>;
   remove(relativePath: string): Promise<void>;
   removeDirectory(relativePath: string): Promise<void>;
+  uriFor(relativePath: string): string;
 }
 
 function createFakeStorage(options: { failCopy?: boolean } = {}): FakeStorage {
@@ -43,6 +44,9 @@ function createFakeStorage(options: { failCopy?: boolean } = {}): FakeStorage {
     },
     async removeDirectory(relativePath) {
       removed.push(relativePath);
+    },
+    uriFor(relativePath) {
+      return `file:///sandbox/${relativePath}`;
     },
   };
   return storage;

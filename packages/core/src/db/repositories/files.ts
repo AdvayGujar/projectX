@@ -103,6 +103,23 @@ export function createFileRepository({ db, ids, now }: DbContext) {
       return result.rows.map((row) => mapFile(row as unknown as FileRow));
     },
 
+    /**
+     * Library rows for the project plus its saved links' summaries. A link snapshot is an
+     * implementation detail of the link, so the library shows the link instead of the file.
+     */
+    async listLibrary(projectId: string): Promise<FileRecord[]> {
+      const result = await db.execute(
+        `SELECT files.* FROM files
+         WHERE files.project_id = ?
+           AND NOT EXISTS (
+             SELECT 1 FROM project_links l WHERE l.snapshot_file_id = files.id
+           )
+         ORDER BY files.created_at DESC`,
+        [projectId],
+      );
+      return result.rows.map((row) => mapFile(row as unknown as FileRow));
+    },
+
     async remove(id: string): Promise<void> {
       try {
         await db.execute("DELETE FROM files WHERE id = ?", [id]);

@@ -3,11 +3,11 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { colors, space, typography } from "../theme";
 
-export type ProjectTabKey = "sessions" | "files" | "memory" | "artifacts";
+export type ProjectTabKey = "sessions" | "library" | "memory" | "artifacts";
 
 const TABS: readonly { readonly key: ProjectTabKey; readonly label: string }[] = [
   { key: "sessions", label: "Sessions" },
-  { key: "files", label: "Files" },
+  { key: "library", label: "Library" },
   { key: "memory", label: "Memory" },
   { key: "artifacts", label: "Artifacts" },
 ];

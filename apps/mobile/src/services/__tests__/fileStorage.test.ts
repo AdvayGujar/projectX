@@ -94,6 +94,24 @@ describe("app file storage directory removal", () => {
   });
 });
 
+describe("app file storage URIs", () => {
+  it("resolves a relative path under Documents without touching the filesystem", () => {
+    const storage = createAppFileStorage();
+
+    expect(storage.uriFor("projects/project-1/library/file-1.pdf")).toBe(
+      "file:///sandbox/Documents/projects/project-1/library/file-1.pdf",
+    );
+    expect(mockFileUris).toHaveLength(0);
+    expect(mockDirectoryUris).toHaveLength(0);
+  });
+
+  it("rejects an escaping path", () => {
+    const storage = createAppFileStorage();
+
+    expect(() => storage.uriFor("../escape")).toThrow();
+  });
+});
+
 describe("app file storage text writes", () => {
   it("creates parent directories and writes text under the Documents root", async () => {
     mockFileSize.mockReturnValue(42);

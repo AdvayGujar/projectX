@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createFileRepository,
+  createProjectLinkRepository,
   createProjectRepository,
   createSessionRepository,
 } from "../index";
@@ -77,5 +78,27 @@ describe("file ownership", () => {
 
     await projects.remove(project.id);
     expect(await files.get(libraryFile.id)).toBeNull();
+  }));
+
+  it("lists library files without the snapshots that belong to links", () => withContext(async (ctx) => {
+    const projects = createProjectRepository(ctx);
+    const links = createProjectLinkRepository(ctx);
+    const files = createFileRepository(ctx);
+    const project = await projects.create({ name: "Reports" });
+
+    const snapshot = await addProjectFile(ctx, project.id, { name: "summary.txt", kind: "text" });
+    const link = await links.add({
+      projectId: project.id,
+      url: "https://example.com/reports",
+      title: "example.com",
+    });
+    await links.update(link.id, { snapshotFileId: snapshot.id, status: "ready" });
+    const normal = await addProjectFile(ctx, project.id, { name: "budget.pdf" });
+
+    expect((await files.listLibrary(project.id)).map((file) => file.id)).toEqual([normal.id]);
+    expect((await files.listByProject(project.id)).map((file) => file.id)).toEqual([
+      normal.id,
+      snapshot.id,
+    ]);
   }));
 });

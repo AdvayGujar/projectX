@@ -47,6 +47,9 @@ function createStorage(): FakeStorage {
     async removeDirectory() {
       throw new Error("the link importer must not remove directories");
     },
+    uriFor(relativePath) {
+      return `file:///sandbox/${relativePath}`;
+    },
   };
 }
 

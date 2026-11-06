@@ -5,9 +5,13 @@ import type {
   Session,
   UpdateProjectInput,
 } from "@projectx/core";
-import { createProjectRepository, createSessionRepository } from "@projectx/core";
+import { createProjectRepository, createSessionRepository, projectDirectory } from "@projectx/core";
 
 import { getDbContext } from "../db/client";
+import { createAppFileStorage } from "./fileStorage";
+
+const PROJECT_CLEANUP_WARNING =
+  "The project was deleted, but its library files could not be removed.";
 
 export interface CreateProjectSessionInput {
   readonly projectId: string;
@@ -36,10 +40,20 @@ export async function updateProject(id: string, patch: UpdateProjectInput): Prom
   return createProjectRepository(context).update(id, patch);
 }
 
-/** Removing a project leaves its chats standalone; the foreign key clears `project_id`. */
-export async function deleteProject(id: string): Promise<void> {
+/**
+ * Removing a project leaves its chats standalone; the foreign key clears `project_id`.
+ * Library rows cascade with the project, then the sandbox folder is removed. A cleanup
+ * failure is reported, not thrown, so a dirty sandbox never restores a deleted project.
+ */
+export async function deleteProject(id: string): Promise<{ cleanupWarning: string | null }> {
   const context = await getDbContext();
   await createProjectRepository(context).remove(id);
+  try {
+    await createAppFileStorage().removeDirectory(projectDirectory(id));
+    return { cleanupWarning: null };
+  } catch {
+    return { cleanupWarning: PROJECT_CLEANUP_WARNING };
+  }
 }
 
 export async function listProjectSessions(projectId: string): Promise<Session[]> {

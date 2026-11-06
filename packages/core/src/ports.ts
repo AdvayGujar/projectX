@@ -28,6 +28,8 @@ export interface FileStoragePort {
    * snapshots such as a project link summary.
    */
   writeText(relativePath: string, text: string): Promise<WrittenText>;
+  /** Absolute sandbox URI for a stored relative path; used by readers and native previews. */
+  uriFor(relativePath: string): string;
   /**
    * Removes a sandbox file. A missing file is not an error. Cleanup deliberately takes no
    * signal: rollback must run even when the import was aborted.

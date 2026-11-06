@@ -15,6 +15,7 @@ export {
   extensionForMime,
   extensionOf,
   fileRelativePath,
+  projectDirectory,
   projectFileRelativePath,
   projectLibraryDirectory,
   safeDisplayName,

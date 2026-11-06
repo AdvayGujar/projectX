@@ -30,10 +30,15 @@ export function sessionFilesDirectory(sessionId: string): string {
   return `sessions/${sessionId}/files`;
 }
 
+/** Root of a project's sandbox folder; deleting a project removes it whole. */
+export function projectDirectory(projectId: string): string {
+  assertSafeSegment(projectId, "project id");
+  return `projects/${projectId}`;
+}
+
 /** Directory that owns the files a project keeps after its chats are gone. */
 export function projectLibraryDirectory(projectId: string): string {
-  assertSafeSegment(projectId, "project id");
-  return `projects/${projectId}/library`;
+  return `${projectDirectory(projectId)}/library`;
 }
 
 /**
