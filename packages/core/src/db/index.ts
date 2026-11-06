@@ -20,6 +20,12 @@ export type {
   UpdatePartInput,
 } from "./repositories/messages";
 export { createProjectRepository } from "./repositories/projects";
+export { createProjectLinkRepository } from "./repositories/projectLinks";
+export type {
+  AddProjectLinkInput,
+  ProjectLinkRepository,
+  UpdateProjectLinkInput,
+} from "./repositories/projectLinks";
 export { createProviderRepository } from "./repositories/providers";
 export type { AddProviderInput, ProviderRecord, ProviderRepository } from "./repositories/providers";
 export type {
@@ -59,6 +65,8 @@ export type {
   Part,
   PartType,
   Project,
+  ProjectLink,
+  ProjectLinkStatus,
   QueryResult,
   Session,
   SqlCommand,
