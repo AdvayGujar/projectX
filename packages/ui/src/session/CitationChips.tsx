@@ -21,20 +21,29 @@ export function CitationChips({
   if (citations.length === 0) {
     return null;
   }
+  const counts = new Map<string, number>();
+  for (const item of citations) {
+    counts.set(item.label, (counts.get(item.label) ?? 0) + 1);
+  }
   return (
     <View style={styles.root}>
-      {citations.map(({ citation, label }, index) => (
-        <Pressable
-          key={`${label}-${citation.fileId}-${index}`}
-          accessibilityRole="button"
-          accessibilityLabel={`Open source ${label}`}
-          hitSlop={8}
-          onPress={() => onOpenCitation(citation)}
-          style={styles.chip}
-        >
-          <Text style={styles.label}>{label}</Text>
-        </Pressable>
-      ))}
+      {citations.map(({ citation, label }, index) => {
+        const text = (counts.get(label) ?? 0) > 1
+          ? `${citation.fileName} ${label}`
+          : label;
+        return (
+          <Pressable
+            key={`${label}-${citation.fileId}-${index}`}
+            accessibilityRole="button"
+            accessibilityLabel={`Open source ${text}`}
+            hitSlop={8}
+            onPress={() => onOpenCitation(citation)}
+            style={styles.chip}
+          >
+            <Text style={styles.label}>{text}</Text>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
