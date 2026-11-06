@@ -173,6 +173,23 @@ component and the screen that composes it.
    the caller passes `{ documentsAllowed: true }`, while image vision and size checks always
    apply.
 
+### Cite a document read
+
+1. Read tools attach `citations` to their `ToolOutcome`: file id, name, kind, and the page or
+   section. The executor preserves them and the engine persists them inside the
+   `tool_result` part, so no schema migration is needed.
+2. `turnPort` forwards citations to the live sink; `sessionQueries` collects them when a chat
+   is reopened. `mergeCitations` drops the same page/section read twice.
+3. `citedCitations(text, citations)` scans the answer for `p.12`, `Slide 4`, or `Budget!C2`
+   and resolves each token against the citations the turn actually read. Sheet references
+   match any chunk range that contains the cited cell. Unknown references stay plain text.
+4. `CitationChips` renders the resolved references as pressable pills under the answer.
+   Android does not reliably deliver taps to a `Text` nested inside another `Text`, so inline
+   chips were replaced with this row; a custom text layout can revisit inline placement.
+5. Tapping a chip loads the matching chunks through `citationSource.loadCitationSource` and
+   opens `CitationSheet`. The sheet shows the extracted page/section text and an Open file
+   button for the original file; no bytes are loaded into the transcript.
+
 ### Open a stored file
 
 1. `apps/mobile/src/services/filePreview.ts` is the only entry point. `openStoredFile(relativePath,
@@ -258,7 +275,7 @@ service and keeping its exported signature (`sendTurn`, `stopTurn`, `SendTurnInp
 
 **Turns.** `apps/mobile/src/services/turnPort.ts` defines a `TurnPort` (`send`, `stop`,
 `isRunning`) and a `TurnSink` (`onUserTurn`, `onAssistantStart`, `onText`, `onReasoning`,
-`onToolActivity`, `onUsage`, `onTurnFinished`, `onSettled`, `onError`). The port resolves the
+`onToolActivity`, `onCitations`, `onUsage`, `onTurnFinished`, `onSettled`, `onError`). The port resolves the
 provider, key and model, supplies the read-tool registry, runs the engine, and reports through
 the sink. It imports no store and no React. `onAssistantStart` carries the engine step so the
 sink can keep one transcript row for a multi-step turn.
