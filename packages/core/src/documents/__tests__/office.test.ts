@@ -117,6 +117,13 @@ describe("XLSX and CSV parsing", () => {
     expect(parsed.chunks[0]?.text).toContain("Item\tAmount");
     expect(parsed.chunks[0]?.text).toContain("A\t10");
   });
+
+  it("uses a tab separator for TSV", () => {
+    const parsed = parseCsv("Item\tAmount\nA\t10", "\t");
+
+    expect(parsed.chunks[0]?.text).toContain("Item\tAmount");
+    expect(parsed.chunks[0]?.text).toContain("A\t10");
+  });
 });
 
 describe("text parsing", () => {

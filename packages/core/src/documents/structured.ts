@@ -131,7 +131,10 @@ async function parse(
     }
     case "xlsx": {
       const parsed = isDelimited(file)
-        ? parseCsv(await storage.readText(file.path, { signal }))
+        ? parseCsv(
+          await storage.readText(file.path, { signal }),
+          extensionOf(file.name) === "tsv" ? "\t" : ",",
+        )
         : parseXlsxBytes(await storage.readBytes(file.path, { signal }));
       return {
         chunks: parsed.chunks.map((chunk, index) => ({

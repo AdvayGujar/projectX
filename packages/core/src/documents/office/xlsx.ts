@@ -13,8 +13,13 @@ export function parseXlsxBytes(bytes: Uint8Array): ParsedSheet {
   return readWorkbook(workbook);
 }
 
-export function parseCsv(text: string): ParsedSheet {
-  const workbook = XLSX.read(text, { type: "string", cellDates: true, cellFormula: true });
+export function parseCsv(text: string, separator = ","): ParsedSheet {
+  const workbook = XLSX.read(text, {
+    type: "string",
+    cellDates: true,
+    cellFormula: true,
+    FS: separator,
+  });
   return readWorkbook(workbook);
 }
 
