@@ -124,6 +124,18 @@ component and the screen that composes it.
 4. No screen wires extraction yet. It lands with `read_document` in M3 so the engine has a
    document input path.
 
+### Build project chat context
+
+1. `createProjectContextRetriever(ctx).retrieve({ projectId, sessionId, query, maxTokens })`
+   reads the project library and the current chat's own files. Other chats and other
+   projects are excluded in SQL by `contextChunks`, `contextTotals`, and
+   `listContextChunks`, so a caller cannot widen the scope by accident.
+2. When the scoped `tokenTotal` fits `maxTokens`, every scoped chunk goes in. Otherwise the
+   retriever takes the top FTS hits, adds each hit's ordinal neighbours, dedupes by chunk
+   id, and fits the chars/4 budget. Only the final chunk is truncated.
+3. The same call returns the project's newest 20 artifacts as metadata. Full spec reads
+   belong to `get_artifact` in M4, so the catalog must not grow into a spec loader.
+
 ### Add a provider
 
 1. Add a preset to `PRESETS` in `packages/core/src/providers/registry.ts`.
