@@ -3,7 +3,7 @@ import { createFileRepository, createSessionRepository } from "../db";
 import type { DbContext, DocumentRecord, FileRecord, Session } from "../db";
 import type { CopiedFile, FileStoragePort } from "../ports";
 import { detectFileKind } from "./kinds";
-import { fileRelativePath, safeDisplayName } from "./paths";
+import { fileRelativePath, projectFileRelativePath, safeDisplayName } from "./paths";
 
 const MIME_PATTERN = /^[a-z0-9][a-z0-9!#$&^_.+-]*\/[a-z0-9][a-z0-9!#$&^_.+-]*$/;
 
@@ -27,9 +27,16 @@ export interface FileImporter {
   import(input: ImportFileInput): Promise<ImportedFile>;
 }
 
+interface ImportTarget {
+  readonly sessionId: string | null;
+  readonly projectId: string | null;
+  readonly relativePath: string;
+}
+
 /**
- * Copies a picked file into the session's sandbox folder, then records the file and its
- * pending extraction row in one transaction. Bytes are removed on every failure path.
+ * Copies a picked file into the sandbox, then records the file and its pending extraction
+ * row in one transaction. A project chat writes into the project library, which outlives the
+ * chat; every other chat owns its files. Bytes are removed on every failure path.
  */
 export function createFileImporter(ctx: DbContext, storage: FileStoragePort): FileImporter {
   const files = createFileRepository(ctx);
@@ -45,29 +52,46 @@ export function createFileImporter(ctx: DbContext, storage: FileStoragePort): Fi
       const name = safeDisplayName(input.name);
       const mime = normalizeMime(input.mime);
       const kind = detectFileKind(name, mime);
-      const relativePath = fileRelativePath(session.id, id, name, mime);
+      const target = importTarget(session, id, name, mime);
 
-      const copied = await copyIntoSession(storage, input.sourceUri, relativePath, input.signal);
+      const copied = await copyIntoStore(storage, input.sourceUri, target.relativePath, input.signal);
       if (input.signal?.aborted) {
-        await discard(storage, relativePath, cancelled());
+        await discard(storage, target.relativePath, cancelled());
         throw cancelled();
       }
 
       try {
         return await files.addWithDocument({
           id,
-          sessionId: session.id,
+          sessionId: target.sessionId,
+          projectId: target.projectId,
           name,
           mime,
           size: copied.size ?? fallbackSize(input.size),
-          path: relativePath,
+          path: target.relativePath,
           kind,
         });
       } catch (error) {
-        await discard(storage, relativePath, error);
+        await discard(storage, target.relativePath, error);
         throw error;
       }
     },
+  };
+}
+
+/** A project chat's imports belong to the project, so deleting the chat leaves them intact. */
+function importTarget(session: Session, fileId: string, name: string, mime: string): ImportTarget {
+  if (session.projectId !== null) {
+    return {
+      sessionId: null,
+      projectId: session.projectId,
+      relativePath: projectFileRelativePath(session.projectId, fileId, name, mime),
+    };
+  }
+  return {
+    sessionId: session.id,
+    projectId: null,
+    relativePath: fileRelativePath(session.id, fileId, name, mime),
   };
 }
 
@@ -84,7 +108,7 @@ async function requireSession(
   return session;
 }
 
-async function copyIntoSession(
+async function copyIntoStore(
   storage: FileStoragePort,
   sourceUri: string,
   relativePath: string,

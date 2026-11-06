@@ -75,9 +75,12 @@ component and the screen that composes it.
 ### Import a file
 
 1. Core owns the record and the path policy: `documents/paths.ts` builds
-   `sessions/<sessionId>/files/<fileId>.<ext>`, the root `paths.ts` validates relative paths
-   for both `db` and `documents`, and `documents/import.ts` copies through the
-   `FileStoragePort` and writes the `files` and pending `documents` rows in one batch.
+   `sessions/<sessionId>/files/<fileId>.<ext>` for a standalone chat and
+   `projects/<projectId>/library/<fileId>.<ext>` for a project chat, the root
+   `paths.ts` validates relative paths for both `db` and `documents`, and
+   `documents/import.ts` copies through the `FileStoragePort` and writes the `files` and
+   pending `documents` rows in one batch. A file is owned by a session or a project, never
+   both; project-chat imports stay in the library when the chat is deleted.
 2. The app supplies the port with `createAppFileStorage()` from
    `apps/mobile/src/services/fileStorage.ts`.
 3. Picker URIs and file names never become paths. Core rejects `..`, absolute paths,

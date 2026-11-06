@@ -75,6 +75,7 @@ describe("file importer", () => {
     });
 
     expect(imported.file.sessionId).toBe(session.id);
+    expect(imported.file.projectId).toBeNull();
     expect(imported.file.name).toBe("Report.PDF");
     expect(imported.file.mime).toBe("application/pdf");
     expect(imported.file.kind).toBe("pdf");
