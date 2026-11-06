@@ -23,6 +23,10 @@ export interface FileStoragePort {
     relativePath: string,
     options?: FileStorageOptions,
   ): Promise<CopiedFile>;
+  /** Reads stored bytes for a JS document parser. The path is always relative and validated. */
+  readBytes(relativePath: string, options?: FileStorageOptions): Promise<Uint8Array>;
+  /** Reads stored UTF-8 text for text, Markdown, and CSV parsing. */
+  readText(relativePath: string, options?: FileStorageOptions): Promise<string>;
   /**
    * Writes UTF-8 text to a sandbox path, creating parent directories. Used for generated
    * snapshots such as a project link summary.

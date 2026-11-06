@@ -2,6 +2,7 @@ export * from "./db";
 export * from "./documents";
 export * from "./providers";
 export * from "./engine";
+export * from "./tools";
 export { assertSafeRelativePath, joinUnderRoot } from "./paths";
 export * from "./ports";
 export { AppError } from "./errors";

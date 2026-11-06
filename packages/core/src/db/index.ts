@@ -1,3 +1,8 @@
+export {
+  createArtifactRepository,
+  isArtifactInScope,
+} from "./repositories/artifacts";
+export type { ArtifactRepository, ArtifactScope } from "./repositories/artifacts";
 export { createChunkRepository } from "./repositories/chunks";
 export type { ChunkDraft, ChunkRepository } from "./repositories/chunks";
 export { createDbContext } from "./context";
@@ -9,7 +14,12 @@ export type {
   UpdateDocumentInput,
 } from "./repositories/documents";
 export { createFileRepository } from "./repositories/files";
-export type { AddFileInput, FileRepository, FileWithDocument } from "./repositories/files";
+export type {
+  AddFileInput,
+  FileListing,
+  FileRepository,
+  FileWithDocument,
+} from "./repositories/files";
 export { migrate, migrations } from "./migrations";
 export { createMessageRepository } from "./repositories/messages";
 export type {
@@ -54,6 +64,10 @@ export type {
   UpdateSessionInput,
 } from "./repositories/sessions";
 export type {
+  ArtifactKind,
+  ArtifactRecord,
+  ArtifactSummary,
+  ArtifactVersionRecord,
   Clock,
   DbContext,
   DocChunk,

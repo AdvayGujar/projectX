@@ -59,7 +59,7 @@ export interface CompletionRequest {
   model: ModelInfo;
   system: string;
   messages: LlmMessage[];
-  tools?: ToolSchema[];
+  tools?: readonly ToolSchema[];
   temperature?: number;
   maxOutputTokens: number;
   sessionId: string;

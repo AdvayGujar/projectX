@@ -1,10 +1,25 @@
 import { AppError } from "../../errors";
 import { assertSafeRelativePath } from "../../paths";
-import type { DbContext, DocumentRecord, FileKind, FileRecord, SqlCommand, SqlValue } from "../types";
+import type {
+  DbContext,
+  DocumentRecord,
+  DocumentStatus,
+  FileKind,
+  FileRecord,
+  SqlCommand,
+  SqlValue,
+} from "../types";
 import { insertPendingDocumentCommand } from "./commands";
 import { toDbError } from "./errors";
 
 const FILE_COLUMNS = "id, session_id, project_id, name, mime, size, path, kind, created_at";
+
+const LISTING_COLUMNS = `SELECT f.id, f.session_id, f.project_id, f.name, f.mime, f.size,
+         f.path, f.kind, f.created_at,
+         d.id AS document_id, d.page_count, d.slide_count, d.sheet_count,
+         d.status, d.error, d.extracted_at
+  FROM files f
+  LEFT JOIN documents d ON d.file_id = f.id`;
 
 interface FileRow {
   id: string;
@@ -41,6 +56,22 @@ export interface AddFileInput {
 export interface FileWithDocument {
   readonly file: FileRecord;
   readonly document: DocumentRecord;
+}
+
+/** A visible file with its extraction row when one exists. */
+export interface FileListing {
+  readonly file: FileRecord;
+  readonly document: DocumentRecord | null;
+}
+
+interface FileListingRow extends FileRow {
+  document_id: string | null;
+  page_count: number | null;
+  slide_count: number | null;
+  sheet_count: number | null;
+  status: string | null;
+  error: string | null;
+  extracted_at: number | null;
 }
 
 export function createFileRepository({ db, ids, now }: DbContext) {
@@ -101,6 +132,30 @@ export function createFileRepository({ db, ids, now }: DbContext) {
         [projectId],
       );
       return result.rows.map((row) => mapFile(row as unknown as FileRow));
+    },
+
+    /**
+     * Everything a chat may read: its project library plus files owned by this session.
+     * A standalone chat only sees its own files.
+     */
+    async listVisible(
+      sessionId: string,
+      projectId: string | null,
+    ): Promise<FileListing[]> {
+      const result = projectId === null
+        ? await db.execute(
+          `${LISTING_COLUMNS}
+           WHERE f.session_id = ?
+           ORDER BY f.created_at DESC`,
+          [sessionId],
+        )
+        : await db.execute(
+          `${LISTING_COLUMNS}
+           WHERE f.project_id = ? OR f.session_id = ?
+           ORDER BY f.created_at DESC`,
+          [projectId, sessionId],
+        );
+      return result.rows.map((row) => mapListing(row as unknown as FileListingRow));
     },
 
     /**
@@ -191,6 +246,26 @@ function pendingDocument(id: string, fileId: string): DocumentRecord {
   };
 }
 
+function mapListing(row: FileListingRow): FileListing {
+  return {
+    file: mapFile(row),
+    document: row.document_id === null ? null : mapListingDocument(row),
+  };
+}
+
+function mapListingDocument(row: FileListingRow): DocumentRecord {
+  return {
+    id: String(row.document_id),
+    fileId: row.id,
+    pageCount: nullableNumber(row.page_count),
+    slideCount: nullableNumber(row.slide_count),
+    sheetCount: nullableNumber(row.sheet_count),
+    status: toDocumentStatus(row.status),
+    error: row.error,
+    extractedAt: nullableNumber(row.extracted_at),
+  };
+}
+
 function mapFile(row: FileRow): FileRecord {
   return {
     id: row.id,
@@ -240,4 +315,17 @@ function optionalValue(value: string | null | undefined): string | null {
   }
   const trimmed = value.trim();
   return trimmed || null;
+}
+
+function nullableNumber(value: number | null): number | null {
+  return value === null ? null : Number(value);
+}
+
+function toDocumentStatus(value: string | null): DocumentStatus {
+  if (value === "pending" || value === "extracting" || value === "ready" || value === "error") {
+    return value;
+  }
+  throw new AppError("db_invalid", `Unknown document status: ${String(value)}`, {
+    userMessage: "A document could not be read.",
+  });
 }

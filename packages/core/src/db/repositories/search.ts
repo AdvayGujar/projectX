@@ -1,4 +1,4 @@
-import type { DbContext, SqlValue } from "../types";
+import type { DbContext, FileKind, SqlValue } from "../types";
 
 export interface SearchOptions {
   limit?: number;
@@ -37,6 +37,7 @@ export interface ContextChunk {
   readonly documentId: string;
   readonly fileId: string;
   readonly fileName: string;
+  readonly fileKind: FileKind;
   readonly ordinal: number;
   readonly page: number | null;
   readonly section: string | null;
@@ -50,7 +51,7 @@ export interface ContextChunkHit extends ContextChunk {
 
 /** Retrieval covers the project library plus the current chat's own files. */
 export interface ContextScope {
-  readonly projectId: string;
+  readonly projectId: string | null;
   readonly sessionId: string;
 }
 
@@ -217,7 +218,7 @@ export function createSearchRepository({ db }: DbContext) {
 export type SearchRepository = ReturnType<typeof createSearchRepository>;
 
 const CONTEXT_COLUMNS = `SELECT c.id AS chunk_id, c.document_id, d.file_id, f.name AS file_name,
-         c.ordinal, c.page, c.section, c.text, c.token_estimate`;
+         f.kind AS file_kind, c.ordinal, c.page, c.section, c.text, c.token_estimate`;
 const CONTEXT_RANK_COLUMN = `, bm25(doc_chunks_fts) AS rank`;
 
 function mapContextChunk(row: Record<string, SqlValue>): ContextChunk {
@@ -226,6 +227,7 @@ function mapContextChunk(row: Record<string, SqlValue>): ContextChunk {
     documentId: String(row.document_id),
     fileId: String(row.file_id),
     fileName: String(row.file_name ?? ""),
+    fileKind: toFileKind(row.file_kind),
     ordinal: Number(row.ordinal),
     page: row.page === null ? null : Number(row.page),
     section: row.section === null ? null : String(row.section),
@@ -280,4 +282,19 @@ function limitOf(options: SearchOptions): number {
 
 function nullableString(value: SqlValue | undefined): string | null {
   return value === null || value === undefined ? null : String(value);
+}
+
+function toFileKind(value: SqlValue | undefined): FileKind {
+  if (
+    value === "pdf" ||
+    value === "docx" ||
+    value === "xlsx" ||
+    value === "pptx" ||
+    value === "image" ||
+    value === "text" ||
+    value === "other"
+  ) {
+    return value;
+  }
+  return "other";
 }

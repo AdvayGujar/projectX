@@ -42,7 +42,7 @@ export function toGoogleContents(system: string, messages: LlmMessage[]): Google
   };
 }
 
-export function toGoogleTools(tools: ToolSchema[] | undefined): unknown[] | undefined {
+export function toGoogleTools(tools: readonly ToolSchema[] | undefined): unknown[] | undefined {
   if (!tools || tools.length === 0) {
     return undefined;
   }
@@ -50,9 +50,60 @@ export function toGoogleTools(tools: ToolSchema[] | undefined): unknown[] | unde
     functionDeclarations: tools.map((tool) => ({
       name: tool.name,
       description: tool.description,
-      parameters: tool.parameters,
+      parameters: toGoogleSchema(tool.parameters),
     })),
   }];
+}
+
+const GOOGLE_SCHEMA_KEYS: ReadonlySet<string> = new Set([
+  "type",
+  "description",
+  "properties",
+  "required",
+  "items",
+  "enum",
+  "nullable",
+  "minimum",
+  "maximum",
+  "minLength",
+  "maxLength",
+  "pattern",
+  "minItems",
+  "maxItems",
+  "anyOf",
+  "oneOf",
+  "allOf",
+]);
+
+/** Gemini accepts an OpenAPI subset; JSON Schema markers like `additionalProperties` are not part of it. */
+function toGoogleSchema(schema: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(schema)) {
+    if (!GOOGLE_SCHEMA_KEYS.has(key)) {
+      continue;
+    }
+    if (key === "properties" && isRecord(value)) {
+      result[key] = Object.fromEntries(
+        Object.entries(value).map(([name, child]) => [
+          name,
+          isRecord(child) ? toGoogleSchema(child) : child,
+        ]),
+      );
+    } else if ((key === "items" || key === "anyOf" || key === "oneOf" || key === "allOf")) {
+      result[key] = Array.isArray(value)
+        ? value.map((item) => (isRecord(item) ? toGoogleSchema(item) : item))
+        : isRecord(value)
+          ? toGoogleSchema(value)
+          : value;
+    } else {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function assistantParts(message: LlmMessage): GooglePart[] {

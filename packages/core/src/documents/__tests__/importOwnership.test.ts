@@ -28,6 +28,12 @@ function createStorage(): RecordingStorage {
       copies.push(relativePath);
       return { size: 2048 };
     },
+    async readBytes() {
+      throw new Error("the importer must not read stored bytes");
+    },
+    async readText() {
+      throw new Error("the importer must not read stored text");
+    },
     async writeText(_relativePath, text) {
       return { size: text.length };
     },

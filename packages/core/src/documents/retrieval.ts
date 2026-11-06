@@ -1,12 +1,13 @@
-import { createSearchRepository } from "../db";
+import { createArtifactRepository, createSearchRepository } from "../db";
 import type {
+  ArtifactSummary,
   ContextChunk,
   ContextScope,
   DbContext,
   SearchRepository,
-  SqlValue,
 } from "../db";
-import { AppError } from "../errors";
+
+export type { ArtifactSummary } from "../db";
 
 const CHARACTERS_PER_TOKEN = 4;
 const BLOCK_SEPARATOR = "\n\n";
@@ -18,13 +19,6 @@ export interface ProjectContextRequest {
   readonly sessionId: string;
   readonly query: string;
   readonly maxTokens: number;
-}
-
-export interface ArtifactSummary {
-  readonly id: string;
-  readonly kind: "deck" | "sheet" | "doc";
-  readonly title: string;
-  readonly currentVersion: number;
 }
 
 export interface ProjectContext {
@@ -43,12 +37,16 @@ export interface ProjectContextRetriever {
  */
 export function createProjectContextRetriever(ctx: DbContext): ProjectContextRetriever {
   const search = createSearchRepository(ctx);
+  const catalog = createArtifactRepository(ctx);
 
   return {
     async retrieve(input: ProjectContextRequest): Promise<ProjectContext> {
       const [chunks, artifacts] = await Promise.all([
         selectChunks(search, input),
-        listArtifacts(ctx, input.projectId),
+        catalog.listSummaries(
+          { projectId: input.projectId, sessionId: input.sessionId },
+          ARTIFACT_LIMIT,
+        ),
       ]);
       return { text: fitChunks(chunks, input.maxTokens), artifacts };
     },
@@ -139,8 +137,22 @@ function formatChunk(chunk: ContextChunk): string {
 }
 
 function formatHeader(chunk: ContextChunk): string {
-  const page = chunk.page === null ? "" : `, p.${chunk.page}`;
-  return `[File: ${chunk.fileName}${page}]`;
+  const location = chunkLocation(chunk);
+  return `[File: ${chunk.fileName}${location ? `, ${location}` : ""}]`;
+}
+
+/** Page for PDFs, slide for decks, sheet range for spreadsheets, section otherwise. */
+export function chunkLocation(chunk: Pick<ContextChunk, "fileKind" | "page" | "section">): string {
+  if (chunk.fileKind === "xlsx") {
+    return chunk.section ?? "";
+  }
+  if (chunk.page === null) {
+    return chunk.section ?? "";
+  }
+  if (chunk.fileKind === "pptx") {
+    return `Slide ${chunk.page}`;
+  }
+  return `p.${chunk.page}`;
 }
 
 function truncateChunk(chunk: ContextChunk, available: number): string | null {
@@ -153,30 +165,4 @@ function truncateChunk(chunk: ContextChunk, available: number): string | null {
   return text.length === 0 ? null : `${header}${BLOCK_SEPARATOR}${text}`;
 }
 
-async function listArtifacts(
-  ctx: DbContext,
-  projectId: string,
-): Promise<readonly ArtifactSummary[]> {
-  const result = await ctx.db.execute(
-    `SELECT id, kind, title, current_version FROM artifacts
-     WHERE project_id = ?
-     ORDER BY updated_at DESC
-     LIMIT ?`,
-    [projectId, ARTIFACT_LIMIT],
-  );
-  return result.rows.map((row) => ({
-    id: String(row.id),
-    kind: toArtifactKind(row.kind),
-    title: String(row.title ?? ""),
-    currentVersion: Number(row.current_version ?? 1),
-  }));
-}
 
-function toArtifactKind(value: SqlValue | undefined): ArtifactSummary["kind"] {
-  if (value === "deck" || value === "sheet" || value === "doc") {
-    return value;
-  }
-  throw new AppError("db_invalid", `Unknown artifact kind: ${String(value)}`, {
-    userMessage: "An artifact could not be read.",
-  });
-}

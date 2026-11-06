@@ -59,6 +59,36 @@ export interface DocumentRecord {
   extractedAt: number | null;
 }
 
+export type ArtifactKind = "deck" | "sheet" | "doc";
+
+/** An artifact keeps a project home, a session origin, or both after a chat is deleted. */
+export interface ArtifactRecord {
+  id: string;
+  sessionId: string | null;
+  projectId: string | null;
+  kind: ArtifactKind;
+  title: string;
+  currentVersion: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface ArtifactVersionRecord {
+  artifactId: string;
+  version: number;
+  specJson: string;
+  createdBy: "model" | "user";
+  createdAt: number;
+}
+
+/** The catalog entry a chat prompt can show without loading the spec. */
+export interface ArtifactSummary {
+  id: string;
+  kind: ArtifactKind;
+  title: string;
+  currentVersion: number;
+}
+
 export type ProjectLinkStatus = "pending" | "fetching" | "ready" | "error";
 
 /** A saved web link in a project library; its summary snapshot is a project-owned file. */

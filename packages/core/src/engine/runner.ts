@@ -1,7 +1,7 @@
 import { AppError } from "../errors";
 import { createMessageRepository } from "../db";
 import type { MessageRepository, Usage } from "../db";
-import type { CompletionRequest, ProviderEvent } from "../providers";
+import type { CompletionRequest, ProviderEvent, ToolSchema } from "../providers";
 import { buildContext } from "./context";
 import {
   appendStreamingText,
@@ -16,6 +16,7 @@ import type {
   ToolCall,
   ToolExecutor,
   ToolResult,
+  ToolRole,
   TurnEvent,
   TurnResult,
   TurnStatus,
@@ -52,6 +53,8 @@ export function createTurnEngine({ db, adapter, tools }: EngineDeps) {
 
       const assistantIds: string[] = [];
       const maxSteps = options.maxSteps ?? DEFAULT_MAX_STEPS;
+      const executedCalls = new Set<string>();
+      const schemas = options.tools ?? tools.schemas;
 
       for (let step = 1; step <= maxSteps; step += 1) {
         if (options.signal?.aborted) {
@@ -71,7 +74,7 @@ export function createTurnEngine({ db, adapter, tools }: EngineDeps) {
           parts: [],
         });
         assistantIds.push(assistant.id);
-        emit({ type: "message_started", messageId: assistant.id });
+        emit({ type: "message_started", messageId: assistant.id, step });
 
         const outcome = await streamAssistant(
           adapter,
@@ -80,8 +83,10 @@ export function createTurnEngine({ db, adapter, tools }: EngineDeps) {
           options,
           context.system,
           context.messages,
+          schemas,
           assistant.id,
           emit,
+          tools.roleOf,
         );
         if (outcome.status !== "done") {
           return finish(emit, outcome.status, user?.id ?? null, assistantIds, outcome.error);
@@ -89,7 +94,35 @@ export function createTurnEngine({ db, adapter, tools }: EngineDeps) {
         if (outcome.toolCalls.length === 0) {
           return finish(emit, "done", user?.id ?? null, assistantIds, undefined, outcome.stopReason);
         }
-        await executeTools(tools, messages, outcome.toolCalls, options.sessionId, options.signal, emit);
+        const repeated = findRepeatedCall(outcome.toolCalls, executedCalls);
+        if (repeated) {
+          const error = repeatedCallError(repeated);
+          emit({
+            type: "error",
+            code: error.code,
+            message: error.userMessage,
+            retryable: false,
+          });
+          return finish(
+            emit,
+            "repeated_tool",
+            user?.id ?? null,
+            assistantIds,
+            error,
+          );
+        }
+        for (const call of outcome.toolCalls) {
+          executedCalls.add(callSignature(call));
+        }
+        await executeTools(
+          tools,
+          messages,
+          outcome.toolCalls,
+          options.sessionId,
+          assistant.id,
+          options.signal,
+          emit,
+        );
       }
 
       return finish(emit, "max_steps", user?.id ?? null, assistantIds);
@@ -106,8 +139,10 @@ async function streamAssistant(
   options: RunTurnOptions,
   system: string,
   history: CompletionRequest["messages"],
+  schemas: readonly ToolSchema[],
   assistantId: string,
   emit: Emit,
+  roleOf: (name: string) => ToolRole | undefined,
 ): Promise<AssistantOutcome> {
   const state: StreamState = {
     text: createStreamingPart(),
@@ -118,10 +153,10 @@ async function streamAssistant(
   };
 
   try {
-    for await (const event of adapter.stream(buildRequest(options, system, history), options.provider)) {
-      await handleEvent(event, state, messages, assistantId, emit, now);
+    for await (const event of adapter.stream(buildRequest(options, system, history, schemas), options.provider)) {
+      await handleEvent(event, state, messages, assistantId, emit, now, roleOf);
     }
-    await finalizePending(state, messages, assistantId, emit);
+    await finalizePending(state, messages, assistantId, emit, roleOf);
     await flushStreamingPart(messages, assistantId, state.text, "text", now());
     await flushStreamingPart(messages, assistantId, state.reasoning, "reasoning", now());
     await messages.updateStatus(assistantId, "done", state.usage);
@@ -143,6 +178,7 @@ async function handleEvent(
   assistantId: string,
   emit: Emit,
   now: () => number,
+  roleOf: (name: string) => ToolRole | undefined,
 ): Promise<void> {
   if (event.type === "text_delta") {
     await appendStreamingText(messages, assistantId, state.text, "text", event.text, now());
@@ -158,7 +194,7 @@ async function handleEvent(
       pending.args += event.argumentsJson;
     }
   } else if (event.type === "tool_call_end") {
-    await finishToolCall(state, event.id, messages, assistantId, emit);
+    await finishToolCall(state, event.id, messages, assistantId, emit, roleOf);
   } else if (event.type === "usage") {
     state.usage = {
       inputTokens: event.inputTokens,
@@ -179,16 +215,19 @@ async function finishToolCall(
   messages: MessageRepository,
   assistantId: string,
   emit: Emit,
+  roleOf: (name: string) => ToolRole | undefined,
 ): Promise<void> {
   const pending = state.pending.get(id);
   if (!pending) {
     return;
   }
   state.pending.delete(id);
+  const name = pending.name || "tool";
   const call: ToolCall = {
     id,
-    name: pending.name || "tool",
+    name,
     arguments: parseArguments(pending.args),
+    role: roleOf(name),
   };
   state.toolCalls.push(call);
   await messages.appendPart(assistantId, { type: "tool_call", data: call });
@@ -200,10 +239,11 @@ async function finalizePending(
   messages: MessageRepository,
   assistantId: string,
   emit: Emit,
+  roleOf: (name: string) => ToolRole | undefined,
 ): Promise<void> {
   const ids = Array.from(state.pending.keys());
   for (const id of ids) {
-    await finishToolCall(state, id, messages, assistantId, emit);
+    await finishToolCall(state, id, messages, assistantId, emit, roleOf);
   }
 }
 
@@ -212,6 +252,7 @@ async function executeTools(
   messages: MessageRepository,
   calls: ToolCall[],
   sessionId: string,
+  assistantMessageId: string,
   signal: AbortSignal | undefined,
   emit: Emit,
 ): Promise<void> {
@@ -219,14 +260,38 @@ async function executeTools(
     if (signal?.aborted) {
       return;
     }
-    const result = await runTool(tools, call, sessionId, signal);
+    const result = normalizeResult(
+      await runTool(tools, call, sessionId, signal),
+      call,
+      tools,
+    );
     const message = await messages.append({
       sessionId,
       role: "tool",
       parts: [{ type: "tool_result", data: result }],
     });
-    emit({ type: "tool_result", messageId: message.id, result });
+    emit({
+      type: "tool_result",
+      messageId: message.id,
+      assistantMessageId,
+      role: result.role ?? "read",
+      result,
+    });
   }
+}
+
+/** A fake or older executor may omit display/role; the Thought row still needs them. */
+function normalizeResult(
+  result: ToolResult,
+  call: ToolCall,
+  tools: ToolExecutor,
+): ToolResult {
+  const role = result.role ?? tools.roleOf(call.name) ?? call.role ?? "read";
+  return {
+    ...result,
+    role,
+    display: result.display ?? call.name,
+  };
 }
 
 async function runTool(
@@ -244,6 +309,8 @@ async function runTool(
       name: call.name,
       content: appError.userMessage,
       isError: true,
+      display: "failed",
+      role: call.role ?? "read",
     };
   }
 }
@@ -252,12 +319,13 @@ function buildRequest(
   options: RunTurnOptions,
   system: string,
   history: CompletionRequest["messages"],
+  schemas: readonly ToolSchema[],
 ): CompletionRequest {
   return {
     model: options.model,
     system,
     messages: history,
-    tools: options.tools,
+    tools: schemas.length > 0 ? schemas : undefined,
     temperature: options.temperature,
     maxOutputTokens: options.maxOutputTokens,
     sessionId: options.sessionId,
@@ -281,6 +349,46 @@ function parseArguments(value: string): unknown {
   } catch {
     return { invalidJson: value };
   }
+}
+
+/** Repeated identical calls mean the model is stuck; the loop stops instead of looping. */
+function findRepeatedCall(
+  calls: readonly ToolCall[],
+  executed: ReadonlySet<string>,
+): ToolCall | null {
+  const seen = new Set(executed);
+  for (const call of calls) {
+    const signature = callSignature(call);
+    if (seen.has(signature)) {
+      return call;
+    }
+    seen.add(signature);
+  }
+  return null;
+}
+
+function callSignature(call: ToolCall): string {
+  return `${call.name}:${stableStringify(call.arguments)}`;
+}
+
+function stableStringify(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(stableStringify).join(",")}]`;
+  }
+  if (value !== null && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, item]) => `${JSON.stringify(key)}:${stableStringify(item)}`);
+    return `{${entries.join(",")}}`;
+  }
+  const json = JSON.stringify(value);
+  return json === undefined ? String(value) : json;
+}
+
+function repeatedCallError(call: ToolCall): AppError {
+  return new AppError("unknown", `Repeated tool call: ${call.name}`, {
+    userMessage: "The model repeated the same tool call, so the turn stopped.",
+  });
 }
 
 async function flushQuietly(

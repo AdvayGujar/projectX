@@ -16,6 +16,8 @@ interface FakeStorage {
     relativePath: string,
     options?: FileStorageOptions,
   ): Promise<{ size: number | null }>;
+  readBytes(relativePath: string): Promise<Uint8Array>;
+  readText(relativePath: string): Promise<string>;
   writeText(relativePath: string, text: string): Promise<{ size: number }>;
   remove(relativePath: string): Promise<void>;
   removeDirectory(relativePath: string): Promise<void>;
@@ -35,6 +37,12 @@ function createFakeStorage(options: { failCopy?: boolean } = {}): FakeStorage {
         throw new Error("copy failed");
       }
       return { size: 2048 };
+    },
+    async readBytes() {
+      throw new Error("the importer must not read stored bytes");
+    },
+    async readText() {
+      throw new Error("the importer must not read stored text");
     },
     async writeText(_relativePath, text) {
       return { size: text.length };
