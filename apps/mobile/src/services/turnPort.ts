@@ -1,6 +1,7 @@
 import {
   AppError,
   createAdapter,
+  createProjectContextRetriever,
   createProjectRepository,
   createProviderConfig,
   createProviderRepository,
@@ -63,6 +64,13 @@ export interface TurnSink {
   onError(message: string): void;
 }
 
+/** A document that already lives in the project library; the bytes stay in storage. */
+export interface DocumentAttachment {
+  readonly fileId: string;
+  readonly name: string;
+  readonly mimeType: string;
+}
+
 export interface TurnInput {
   readonly sessionId: string;
   readonly text: string;
@@ -71,6 +79,7 @@ export interface TurnInput {
   readonly effort: string;
   readonly think: boolean;
   readonly images?: readonly ImageAttachment[];
+  readonly documents?: readonly DocumentAttachment[];
   /** Re-runs the answer to an existing user message instead of appending a new one. */
   readonly regenerate?: boolean;
 }
@@ -96,7 +105,6 @@ export function createTurnPort(sink: TurnSink): TurnPort {
 
     try {
       const context = await getDbContext();
-      const system = await systemPromptFor(context, input.sessionId);
       const providers = createProviderRepository(context);
       const provider = await providers.get(parsed.providerId);
       if (!provider) {
@@ -113,6 +121,7 @@ export function createTurnPort(sink: TurnSink): TurnPort {
       }
 
       const model = await findModel(await providers.listModels(provider.id), parsed.modelId);
+      const system = await systemPromptFor(context, input, model);
       const config = createProviderConfig(provider.presetId, {
         id: provider.id,
         label: provider.label,
@@ -198,26 +207,48 @@ export function createTurnPort(sink: TurnSink): TurnPort {
   };
 }
 
-/** A standalone chat has no project, and a project without guidance adds nothing. */
-async function systemPromptFor(context: DbContext, sessionId: string): Promise<string> {
-  const session = await createSessionRepository(context).get(sessionId);
+/** A standalone chat gets no project context, and an empty project adds nothing. */
+async function systemPromptFor(
+  context: DbContext,
+  input: TurnInput,
+  model: ModelInfo,
+): Promise<string> {
+  const session = await createSessionRepository(context).get(input.sessionId);
   if (!session?.projectId) {
     return "";
   }
   const project = await createProjectRepository(context).get(session.projectId);
-  return composeSystemPrompt(project?.instructions);
+  const retrieved = await createProjectContextRetriever(context).retrieve({
+    projectId: session.projectId,
+    sessionId: input.sessionId,
+    query: input.text,
+    maxTokens: retrievalBudget(model),
+  });
+  return composeSystemPrompt(project?.instructions, retrieved.text, retrieved.artifacts);
+}
+
+/** Retrieval gets a quarter of the model window, bounded so small and huge models stay sane. */
+function retrievalBudget(model: ModelInfo): number {
+  return Math.max(1_000, Math.min(8_000, Math.floor(model.contextWindow * 0.25)));
 }
 
 function attachmentsOf(input: TurnInput): TurnAttachment[] {
-  return (input.images ?? []).map((image, index) => ({
+  const images = (input.images ?? []).map((image, index) => ({
     index,
     name: image.name,
     mimeType: image.mimeType,
     kind: "image" as const,
   }));
+  const documents = (input.documents ?? []).map((document, index) => ({
+    index: images.length + index,
+    name: document.name,
+    mimeType: document.mimeType,
+    kind: "document" as const,
+  }));
+  return [...images, ...documents];
 }
 
-/** Text first, then one attachment part per image so history can rebuild vision input. */
+/** Text first, then images, then documents so history and chip indices stay aligned. */
 function userParts(input: TurnInput): PartInput[] {
   const parts: PartInput[] = [{ type: "text", data: { text: input.text } }];
   for (const image of input.images ?? []) {
@@ -228,6 +259,17 @@ function userParts(input: TurnInput): PartInput[] {
         name: image.name,
         mimeType: image.mimeType,
         data: image.base64,
+      },
+    });
+  }
+  for (const document of input.documents ?? []) {
+    parts.push({
+      type: "attachment",
+      data: {
+        kind: "document",
+        fileId: document.fileId,
+        name: document.name,
+        mimeType: document.mimeType,
       },
     });
   }

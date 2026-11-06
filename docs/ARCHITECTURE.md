@@ -124,6 +124,44 @@ component and the screen that composes it.
 4. No screen wires extraction yet. It lands with `read_document` in M3 so the engine has a
    document input path.
 
+### Build project chat context
+
+1. `createProjectContextRetriever(ctx).retrieve({ projectId, sessionId, query, maxTokens })`
+   reads the project library and the current chat's own files. Other chats and other
+   projects are excluded in SQL by `contextChunks`, `contextTotals`, and
+   `listContextChunks`, so a caller cannot widen the scope by accident.
+2. When the scoped `tokenTotal` fits `maxTokens`, every scoped chunk goes in. Otherwise the
+   retriever takes the top FTS hits, adds each hit's ordinal neighbours, dedupes by chunk
+   id, and fits the chars/4 budget. Only the final chunk is truncated.
+3. The same call returns the project's newest 20 artifacts as metadata. Full spec reads
+   belong to `get_artifact` in M4, so the catalog must not grow into a spec loader.
+4. `turnPort.ts` resolves the model first, then loads the session and its project. A project
+   chat retrieves with `maxTokens = max(1_000, min(8_000, floor(contextWindow * 0.25)))`,
+   and `composeSystemPrompt(instructions, retrieved.text, retrieved.artifacts)` joins the
+   non-empty sections — instructions, library, artifact catalog — with blank lines. A
+   standalone chat, or a project with nothing to add, sends `""`.
+5. The library text is already page-tagged (`[File: …, p.N]`) by the retriever. The turn does
+   not load full artifact specs; that is `get_artifact` in M4.
+
+### Attach a document in a project chat
+
+1. The composer's `attach()` sends images down the existing picker-URI/vision path.
+2. In a project chat, a document goes through `ingestFile({ sessionId, sourceUri, name,
+   mime, size })`. The importer derives the project from the chat and writes the file into
+   the project library, so it survives deleting the chat. The chip carries the library
+   `fileId`, not the picker URI.
+3. `ingestFile` runs the PDF extraction before returning. The chip is only added when the
+   document did not end in `error`; a failed import still stays in the library, with a notice
+   explaining that its text could not be read.
+4. `send()` passes document chips as `{ fileId, name, mimeType }` in `TurnInput.documents`.
+   The port writes one `attachment` part per document after the image parts, so transcript
+   chip indices line up with the stored part order. `loadAttachment` tolerates document parts
+   and returns `base64: null`; the viewer stays image-only.
+5. A standalone chat has no library to read through, so it shows a notice that documents
+   belong to a project instead of adding a chip. `attachmentProblem` blocks documents unless
+   the caller passes `{ documentsAllowed: true }`, while image vision and size checks always
+   apply.
+
 ### Add a provider
 
 1. Add a preset to `PRESETS` in `packages/core/src/providers/registry.ts`.

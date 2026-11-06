@@ -32,9 +32,9 @@ describe("attachment capability check", () => {
     expect(attachmentProblem([], chat)).toBeNull();
   });
 
-  it("blocks documents until extraction exists", () => {
+  it("blocks documents outside a project", () => {
     expect(attachmentProblem([document()], vision)).toBe(
-      "Documents can't be read yet. Remove the file or attach an image.",
+      "Documents belong to a project. Move this chat into a project or remove the file.",
     );
   });
 
@@ -52,5 +52,23 @@ describe("attachment capability check", () => {
     expect(attachmentProblem([image({ size: MAX_IMAGE_BYTES + 1 })], vision)).toBe(
       "photo.jpg is larger than 10 MB.",
     );
+  });
+
+  it("allows documents when the caller reads them through a project", () => {
+    expect(attachmentProblem([document()], vision, { documentsAllowed: true })).toBeNull();
+    expect(attachmentProblem([document()], null, { documentsAllowed: true })).toBeNull();
+  });
+
+  it("still enforces image rules when documents are allowed", () => {
+    expect(
+      attachmentProblem([document(), image()], chat, { documentsAllowed: true }),
+    ).toBe(
+      "DeepSeek Chat cannot read images. Choose a vision model or remove the image.",
+    );
+    expect(
+      attachmentProblem([document(), image({ size: MAX_IMAGE_BYTES + 1 })], vision, {
+        documentsAllowed: true,
+      }),
+    ).toBe("photo.jpg is larger than 10 MB.");
   });
 });

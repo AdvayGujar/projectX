@@ -37,6 +37,11 @@ export type {
 export { createSearchRepository, toFtsQuery } from "./repositories/search";
 export type {
   ChunkSearchHit,
+  ContextChunk,
+  ContextChunkHit,
+  ContextScope,
+  ContextSearchOptions,
+  ContextTotals,
   MessageSearchHit,
   SearchOptions,
   SearchRepository,

@@ -23,6 +23,38 @@ export interface ChunkSearchHit {
   rank: number;
 }
 
+/** A chunk ready to become model context: text plus the citation its header needs. */
+export interface ContextChunk {
+  readonly chunkId: string;
+  readonly documentId: string;
+  readonly fileId: string;
+  readonly fileName: string;
+  readonly ordinal: number;
+  readonly page: number | null;
+  readonly section: string | null;
+  readonly text: string;
+  readonly tokenEstimate: number;
+}
+
+export interface ContextChunkHit extends ContextChunk {
+  readonly rank: number;
+}
+
+/** Retrieval covers the project library plus the current chat's own files. */
+export interface ContextScope {
+  readonly projectId: string;
+  readonly sessionId: string;
+}
+
+export interface ContextSearchOptions extends ContextScope {
+  readonly limit?: number;
+}
+
+export interface ContextTotals {
+  readonly chunkCount: number;
+  readonly tokenTotal: number;
+}
+
 export function createSearchRepository({ db }: DbContext) {
   return {
     async messages(query: string, options: SearchOptions = {}): Promise<MessageSearchHit[]> {
@@ -83,10 +115,100 @@ export function createSearchRepository({ db }: DbContext) {
         rank: Number(row.rank ?? 0),
       }));
     },
+
+    async contextChunks(
+      query: string,
+      options: ContextSearchOptions,
+    ): Promise<ContextChunkHit[]> {
+      const match = toFtsQuery(query);
+      if (!match) {
+        return [];
+      }
+      const result = await db.execute(
+        `${CONTEXT_COLUMNS}${CONTEXT_RANK_COLUMN}
+         FROM doc_chunks_fts
+         JOIN doc_chunks c ON c.rowid = doc_chunks_fts.rowid
+         JOIN documents d ON d.id = c.document_id
+         JOIN files f ON f.id = d.file_id
+         WHERE doc_chunks_fts MATCH ? AND d.status = 'ready'
+           AND (f.project_id = ? OR f.session_id = ?)
+         ORDER BY rank
+         LIMIT ?`,
+        [match, options.projectId, options.sessionId, contextLimit(options.limit)],
+      );
+      return result.rows.map((row) => ({
+        ...mapContextChunk(row),
+        rank: Number(row.rank ?? 0),
+      }));
+    },
+
+    async contextNeighbors(documentId: string, ordinal: number): Promise<ContextChunk[]> {
+      const result = await db.execute(
+        `${CONTEXT_COLUMNS}
+         FROM doc_chunks c
+         JOIN documents d ON d.id = c.document_id
+         JOIN files f ON f.id = d.file_id
+         WHERE c.document_id = ? AND d.status = 'ready'
+           AND c.ordinal BETWEEN ? AND ?
+         ORDER BY c.ordinal`,
+        [documentId, ordinal - 1, ordinal + 1],
+      );
+      return result.rows.map(mapContextChunk);
+    },
+
+    async contextTotals(scope: ContextScope): Promise<ContextTotals> {
+      const result = await db.execute(
+        `SELECT COUNT(*) AS chunk_count, COALESCE(SUM(c.token_estimate), 0) AS token_total
+         FROM doc_chunks c
+         JOIN documents d ON d.id = c.document_id
+         JOIN files f ON f.id = d.file_id
+         WHERE d.status = 'ready' AND (f.project_id = ? OR f.session_id = ?)`,
+        [scope.projectId, scope.sessionId],
+      );
+      return {
+        chunkCount: Number(result.rows[0]?.chunk_count ?? 0),
+        tokenTotal: Number(result.rows[0]?.token_total ?? 0),
+      };
+    },
+
+    async listContextChunks(scope: ContextScope): Promise<ContextChunk[]> {
+      const result = await db.execute(
+        `${CONTEXT_COLUMNS}
+         FROM doc_chunks c
+         JOIN documents d ON d.id = c.document_id
+         JOIN files f ON f.id = d.file_id
+         WHERE d.status = 'ready' AND (f.project_id = ? OR f.session_id = ?)
+         ORDER BY f.created_at, c.page, c.ordinal, c.id`,
+        [scope.projectId, scope.sessionId],
+      );
+      return result.rows.map(mapContextChunk);
+    },
   };
 }
 
 export type SearchRepository = ReturnType<typeof createSearchRepository>;
+
+const CONTEXT_COLUMNS = `SELECT c.id AS chunk_id, c.document_id, d.file_id, f.name AS file_name,
+         c.ordinal, c.page, c.section, c.text, c.token_estimate`;
+const CONTEXT_RANK_COLUMN = `, bm25(doc_chunks_fts) AS rank`;
+
+function mapContextChunk(row: Record<string, SqlValue>): ContextChunk {
+  return {
+    chunkId: String(row.chunk_id),
+    documentId: String(row.document_id),
+    fileId: String(row.file_id),
+    fileName: String(row.file_name ?? ""),
+    ordinal: Number(row.ordinal),
+    page: row.page === null ? null : Number(row.page),
+    section: row.section === null ? null : String(row.section),
+    text: String(row.text ?? ""),
+    tokenEstimate: Number(row.token_estimate ?? 0),
+  };
+}
+
+function contextLimit(limit: number | undefined): number {
+  return Math.max(1, Math.min(limit ?? 10, 50));
+}
 
 export function toFtsQuery(input: string): string | null {
   const terms = input

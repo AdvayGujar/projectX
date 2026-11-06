@@ -9,24 +9,33 @@ export interface ImageAttachment {
   readonly base64: string;
 }
 
+export interface AttachmentRules {
+  /** Project chats attach documents through the library; other chats cannot read them. */
+  readonly documentsAllowed?: boolean;
+}
+
 /**
- * The single capability gate for attachments (D12). Documents are blocked until the
- * extraction pipeline can hand the model text; images need a vision model.
+ * The single capability gate for attachments (D12). Documents are blocked unless the caller
+ * has a project library to read them through; images always need a vision model and fit the
+ * inline size limit.
  */
 export function attachmentProblem(
   attachments: readonly AttachmentChip[],
   model: Pick<ModelOption, "label" | "vision"> | null,
+  rules: AttachmentRules = {},
 ): string | null {
   if (attachments.length === 0) {
     return null;
   }
-  if (attachments.some((attachment) => attachment.kind === "document")) {
-    return "Documents can't be read yet. Remove the file or attach an image.";
+  const hasDocument = attachments.some((attachment) => attachment.kind === "document");
+  if (hasDocument && !rules.documentsAllowed) {
+    return "Documents belong to a project. Move this chat into a project or remove the file.";
   }
-  if (!model?.vision) {
+  const images = attachments.filter((attachment) => attachment.kind === "image");
+  if (images.length > 0 && !model?.vision) {
     return `${model?.label ?? "The selected model"} cannot read images. Choose a vision model or remove the image.`;
   }
-  const oversized = attachments.find(
+  const oversized = images.find(
     (attachment) => attachment.size !== null && attachment.size > MAX_IMAGE_BYTES,
   );
   return oversized ? `${oversized.name} is larger than 10 MB.` : null;

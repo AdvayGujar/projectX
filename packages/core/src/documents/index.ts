@@ -11,6 +11,13 @@ export { createFileImporter } from "./import";
 export type { FileImporter, ImportedFile, ImportFileInput } from "./import";
 export { createProjectLinkImporter } from "./links";
 export type { AddProjectLinkRequest, ProjectLinkImporter } from "./links";
+export { createProjectContextRetriever } from "./retrieval";
+export type {
+  ArtifactSummary,
+  ProjectContext,
+  ProjectContextRequest,
+  ProjectContextRetriever,
+} from "./retrieval";
 export {
   extensionForMime,
   extensionOf,
