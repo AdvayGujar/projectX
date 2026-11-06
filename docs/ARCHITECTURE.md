@@ -39,7 +39,9 @@ apps/mobile/
     spike/                      throwaway M0 checks
 
 packages/core/src/
-  providers/                    four wire-protocol adapters + catalog + registry
+  providers/                    four wire-protocol adapters, catalog, and registry; capability
+                                presets, reasoning dialects, and search adapters land with
+                                M3.2a/M3.2b
   engine/                       turn loop, context assembly, streamed parts
   tools/                        read-tool contracts, Zod schemas, and scoped implementations
   documents/                    path policy, kind detection, file importer, chunking,
@@ -239,10 +241,40 @@ component and the screen that composes it.
 ### Add a provider
 
 1. Add a preset to `PRESETS` in `packages/core/src/providers/registry.ts`.
-2. If it speaks an existing protocol (`openai-chat`, `openai-responses`, `anthropic`, `google`),
-   stop — `createAdapter` already handles it.
-3. Only a genuinely new wire format needs a new adapter file plus one `case` in
+2. Add its model entries and capability profile: `reasoning` (`canDisable`, effort levels,
+   dialect), `search`, `structuredOutput`, `files`, and `cache`. These are per model, not per
+   protocol.
+3. If it speaks an existing protocol (`openai-chat`, `openai-responses`, `anthropic`, `google`),
+   the transport is done. Still add the reasoning dialect and search adapter, or the provider
+   will silently ignore Think and Search.
+4. Only a genuinely new wire format needs a new adapter file plus one `case` in
    `providers/adapterFactory.ts`.
+5. Add fixtures for reasoning off/on, a tool loop that preserves reasoning history, structured
+   output, native search, and cached-token usage. Never claim support from a preset name alone.
+
+### Add a search adapter
+
+1. **Native raw API** (DeepSeek, Kimi): implement `ProviderSearchAdapter` keyed by preset. Use
+   the provider key and base URL; normalise results to `SourceRef`; record one search line item.
+2. **Native server tool** (Anthropic, OpenAI, Google, xAI, OpenRouter, Groq): add the tool or
+   request field in that provider's adapter. Do not register a generic `web_search` function.
+3. **Third-party BYO** (Brave, Tavily, Exa, Firecrawl, Parallel): implement
+   `ThirdPartySearchAdapter` keyed by vendor. Key lives in Keychain, never in SQLite or logs.
+   There is no default vendor and no app-run search service.
+4. Every path must feed the same citations/source sheet and the same cost ledger. A native
+   result and a BYO result must be indistinguishable to the UI.
+
+### Change reasoning behaviour
+
+1. `CompletionRequest` carries one neutral `ReasoningRequest`; never pass a raw provider field
+   through the engine.
+2. Map it per preset: DeepSeek/Kimi `thinking`, Responses `reasoning.effort`, Anthropic
+   `thinking` + `output_config.effort`, Google `thinkingConfig`, Groq `reasoning_effort`,
+   OpenRouter `reasoning`.
+3. `canDisable: false` means the composer shows `Always on`; the request must not pretend to
+   disable reasoning.
+4. Preserve reasoning blocks in history when the provider requires them for tool calls.
+   Dropping them is a 400 on DeepSeek/Kimi and a quality regression elsewhere.
 
 ### Add a tool
 
@@ -315,6 +347,13 @@ the import graph; it fails CI if a deep import appears.
 2. **Two test runners.** Vitest for core/ui, Jest for mobile, because Expo's renderer preset
    only ships for Jest. Component tests therefore live in `apps/mobile` even when they assert
    `packages/ui` behaviour.
+3. **The provider capability catalog is hand-maintained.** Model IDs and reasoning/search
+   support drift. Refresh from `plan.md` §6 and add fixtures when a model changes.
+4. **OpenCode Go is a gateway.** Its reasoning and search support is model- and route-specific
+   and not fully documented. Probe a model before exposing a capability.
+5. **Reasoning history is per provider and easy to regress.** Tool loops with thinking on
+   need `reasoning_content` (DeepSeek/Kimi), thinking blocks (Anthropic), or thought
+   signatures (Google); keep a recorded fixture for each.
 
 ## Conventions worth repeating
 
