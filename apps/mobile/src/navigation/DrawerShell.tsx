@@ -2,9 +2,10 @@ import type { DrawerDestination } from "@projectx/ui";
 import { DrawerContent } from "@projectx/ui";
 import { useRouter } from "expo-router";
 import type { ReactElement } from "react";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 import { useSessionsStore } from "../state/sessionsStore";
+import { useDrawerSearch } from "./useDrawerSearch";
 
 /**
  * Structural subset of the drawer content props. Expo Router vendors its own React
@@ -37,7 +38,7 @@ const ACCOUNT_NAME = "Advay";
 
 export function DrawerShell(props: DrawerShellProps): ReactElement {
   const router = useRouter();
-  const [search, setSearch] = useState("");
+  const search = useDrawerSearch(props.navigation);
   const sessions = useSessionsStore((state) => state.sessions);
   const refresh = useSessionsStore((state) => state.refresh);
 
@@ -47,9 +48,6 @@ export function DrawerShell(props: DrawerShellProps): ReactElement {
 
   const routeName = props.state.routeNames[props.state.index] ?? "index";
   const activeKey = activeKeyForRoute(routeName);
-  const recents = sessions.filter((session) =>
-    session.title.toLowerCase().includes(search.trim().toLowerCase()),
-  );
 
   function selectDestination(key: string): void {
     const route = ROUTE_BY_KEY[key] ?? "/";
@@ -71,12 +69,16 @@ export function DrawerShell(props: DrawerShellProps): ReactElement {
     <DrawerContent
       destinations={DESTINATIONS}
       activeKey={activeKey}
-      recents={recents}
+      recents={sessions}
       accountName={ACCOUNT_NAME}
-      search={search}
-      onSearchChange={setSearch}
+      search={search.query}
+      searchGroups={search.groups}
+      searching={search.searching}
+      searchError={search.error}
+      onSearchChange={search.setQuery}
       onSelectDestination={selectDestination}
       onSelectSession={selectSession}
+      onSelectSearchResult={search.selectResult}
       onOpenSettings={openSettings}
     />
   );

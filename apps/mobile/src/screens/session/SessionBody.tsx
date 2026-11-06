@@ -8,6 +8,8 @@ export interface SessionBodyProps {
   readonly turns: readonly ViewTurn[];
   readonly error: string | null;
   readonly streaming: boolean;
+  /** Message id from a drawer search result; scrolled into view once. */
+  readonly focusTurnId?: string | null;
   readonly onCopy: (turnId: string) => void;
   readonly onRegenerate: (turnId: string) => void;
   readonly onOpenAttachment: (turnId: string, attachment: TurnAttachment) => void;
@@ -15,11 +17,14 @@ export interface SessionBodyProps {
   readonly onOpenSources: () => void;
 }
 
+const FOCUS_TOP_OFFSET = 16;
+
 /** Scrolling zone: transcript, empty state and the inline error. */
 export function SessionBody({
   turns,
   error,
   streaming,
+  focusTurnId = null,
   onCopy,
   onRegenerate,
   onOpenAttachment,
@@ -27,6 +32,45 @@ export function SessionBody({
   onOpenSources,
 }: SessionBodyProps): ReactElement {
   const scrollRef = useRef<ScrollViewInstance>(null);
+  const offsets = useRef(new Map<string, number>());
+  const focusedTurnId = useRef<string | null>(null);
+  const contentSized = useRef(false);
+
+  const activeFocusId =
+    focusTurnId !== null && turns.some((turn) => turn.id === focusTurnId)
+      ? focusTurnId
+      : null;
+
+  function scrollToFocus(): void {
+    if (!activeFocusId || focusedTurnId.current === activeFocusId) {
+      return;
+    }
+    const offset = offsets.current.get(activeFocusId);
+    if (offset === undefined) {
+      return;
+    }
+    if (contentSized.current) {
+      focusedTurnId.current = activeFocusId;
+    }
+    scrollRef.current?.scrollTo({
+      y: Math.max(0, offset - FOCUS_TOP_OFFSET),
+      animated: false,
+    });
+  }
+
+  function handleTurnLayout(turnId: string, y: number): void {
+    offsets.current.set(turnId, y);
+    scrollToFocus();
+  }
+
+  function handleContentSizeChange(): void {
+    contentSized.current = true;
+    if (activeFocusId && focusedTurnId.current !== activeFocusId) {
+      scrollToFocus();
+      return;
+    }
+    scrollRef.current?.scrollToEnd({ animated: true });
+  }
 
   return (
     <ScrollView
@@ -34,7 +78,7 @@ export function SessionBody({
       style={styles.scroll}
       contentContainerStyle={styles.content}
       keyboardShouldPersistTaps="handled"
-      onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
+      onContentSizeChange={handleContentSizeChange}
     >
       {turns.length > 0 ? (
         <Transcript
@@ -44,6 +88,7 @@ export function SessionBody({
           onOpenAttachment={onOpenAttachment}
           onReadAloud={onReadAloud}
           onOpenSources={onOpenSources}
+          onTurnLayout={handleTurnLayout}
         />
       ) : (
         <Text style={styles.placeholder}>

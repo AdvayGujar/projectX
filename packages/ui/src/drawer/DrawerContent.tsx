@@ -5,6 +5,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Icon } from "../icons";
 import { colors, HIT_SLOP, radius, space, typography } from "../theme";
 import type { DrawerDestination, RecentSession } from "../types";
+import type { DrawerSearchGroup, DrawerSearchItem } from "./DrawerSearchResults";
+import { DrawerSearchResults } from "./DrawerSearchResults";
 
 export interface DrawerContentProps {
   readonly destinations: readonly DrawerDestination[];
@@ -12,9 +14,13 @@ export interface DrawerContentProps {
   readonly recents: readonly RecentSession[];
   readonly accountName: string;
   readonly search: string;
+  readonly searchGroups: readonly DrawerSearchGroup[];
+  readonly searching: boolean;
+  readonly searchError: string | null;
   readonly onSearchChange: (value: string) => void;
   readonly onSelectDestination: (key: string) => void;
   readonly onSelectSession: (id: string) => void;
+  readonly onSelectSearchResult: (item: DrawerSearchItem) => void;
   readonly onOpenSettings: () => void;
 }
 
@@ -25,12 +31,17 @@ export function DrawerContent({
   recents,
   accountName,
   search,
+  searchGroups,
+  searching,
+  searchError,
   onSearchChange,
   onSelectDestination,
   onSelectSession,
+  onSelectSearchResult,
   onOpenSettings,
 }: DrawerContentProps): ReactElement {
   const insets = useSafeAreaInsets();
+  const showSearchResults = search.trim().length > 0;
 
   return (
     <View style={[styles.root, { paddingTop: insets.top + space.sm, paddingBottom: insets.bottom }]}>
@@ -39,11 +50,11 @@ export function DrawerContent({
       <View style={styles.search}>
         <Icon name="search" size={15} color={colors.textMuted} />
         <TextInput
-          accessibilityLabel="Search chats"
+          accessibilityLabel="Search chats and files"
           style={styles.searchInput}
           value={search}
           onChangeText={onSearchChange}
-          placeholder="Search chats…"
+          placeholder="Search chats and files…"
           placeholderTextColor={colors.textFaint}
           returnKeyType="search"
         />
@@ -73,23 +84,34 @@ export function DrawerContent({
         })}
       </View>
 
-      <Text style={styles.sectionLabel}>Recents</Text>
+      {showSearchResults ? (
+        <DrawerSearchResults
+          groups={searchGroups}
+          searching={searching}
+          error={searchError}
+          onSelect={onSelectSearchResult}
+        />
+      ) : (
+        <>
+          <Text style={styles.sectionLabel}>Recents</Text>
 
-      <ScrollView style={styles.recents} contentContainerStyle={styles.recentsContent}>
-        {recents.map((session) => (
-          <Pressable
-            key={session.id}
-            accessibilityRole="button"
-            onPress={() => onSelectSession(session.id)}
-            style={styles.recentRow}
-          >
-            <Text style={styles.recentTitle} numberOfLines={1}>
-              {session.title}
-            </Text>
-          </Pressable>
-        ))}
-        {recents.length === 0 ? <Text style={styles.emptyRecents}>No chats yet</Text> : null}
-      </ScrollView>
+          <ScrollView style={styles.recents} contentContainerStyle={styles.recentsContent}>
+            {recents.map((session) => (
+              <Pressable
+                key={session.id}
+                accessibilityRole="button"
+                onPress={() => onSelectSession(session.id)}
+                style={styles.recentRow}
+              >
+                <Text style={styles.recentTitle} numberOfLines={1}>
+                  {session.title}
+                </Text>
+              </Pressable>
+            ))}
+            {recents.length === 0 ? <Text style={styles.emptyRecents}>No chats yet</Text> : null}
+          </ScrollView>
+        </>
+      )}
 
       <View style={styles.account}>
         <View style={styles.avatar}>
