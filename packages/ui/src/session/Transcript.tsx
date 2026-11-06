@@ -73,10 +73,11 @@ export function Transcript({
           </View>
         ) : (
           <View key={turn.id} style={styles.assistantRow} onLayout={layoutHandler(turn.id)}>
-            {turn.reasoningRequested !== false && turn.reasoning ? (
+            {(turn.reasoningRequested !== false && Boolean(turn.reasoning)) ||
+            (turn.activity?.length ?? 0) > 0 ? (
               <Thought
                 summary={summarise(turn)}
-                reasoning={turn.reasoning}
+                reasoning={turn.reasoning ?? ""}
                 activity={turn.activity ?? []}
                 open={openThoughtId === turn.id}
                 onToggle={() =>

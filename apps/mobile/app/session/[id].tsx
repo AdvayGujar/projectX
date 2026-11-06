@@ -108,7 +108,7 @@ export default function SessionScreen(): ReactElement {
       return;
     }
     const problem = attachmentProblem(attachments, currentModel, {
-      documentsAllowed: projectId !== null,
+      documentsAllowed: true,
     });
     if (problem) {
       setNotice({ message: problem, icon: "image" });
@@ -157,13 +157,7 @@ export default function SessionScreen(): ReactElement {
       addPickerAttachment(asset.uri, asset.name, mimeType, asset.size ?? null);
       return;
     }
-    if (projectId === null) {
-      setNotice({
-        message: "Documents belong to a project. Open a project chat to add this file to its library.",
-        icon: "attach",
-      });
-      return;
-    }
+    const place = projectId === null ? "this chat" : "the project library";
     setNotice({ message: "Reading document…", icon: "attach" });
     try {
       const imported = await ingestFile({
@@ -175,14 +169,14 @@ export default function SessionScreen(): ReactElement {
       });
       if (imported.document.status === "error") {
         setNotice({
-          message: `${imported.file.name} joined the project library, but its text could not be read.`,
+          message: `${imported.file.name} joined ${place}, but its text could not be read.`,
           icon: "attach",
         });
         return;
       }
       if (imported.document.status !== "ready") {
         setNotice({
-          message: `${imported.file.name} joined the project library. This format cannot be read yet.`,
+          message: `${imported.file.name} joined ${place}. This format cannot be read yet.`,
           icon: "attach",
         });
         return;
@@ -199,7 +193,7 @@ export default function SessionScreen(): ReactElement {
         },
       ]);
     } catch {
-      setNotice({ message: "Could not add that document to the project library.", icon: "attach" });
+      setNotice({ message: `Could not add that document to ${place}.`, icon: "attach" });
     }
   }
 

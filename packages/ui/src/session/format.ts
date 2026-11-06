@@ -2,9 +2,13 @@ import type { ViewTurn } from "../types";
 
 /** Pure formatting used by the transcript; kept free of React Native for testing. */
 
+const DOCUMENT_READ_TOOLS: ReadonlySet<string> = new Set(["read_document", "read_sheet"]);
+
 export function summarise(turn: ViewTurn): string {
   const activity = turn.activity ?? [];
-  const reads = activity.filter((item) => item.kind === "read").length;
+  const reads = activity.filter(
+    (item) => item.kind === "read" && DOCUMENT_READ_TOOLS.has(item.tool),
+  ).length;
   const parts = ["Thought"];
   if (activity.length > 0) {
     parts.push(`${activity.length} tool${activity.length === 1 ? "" : "s"}`);

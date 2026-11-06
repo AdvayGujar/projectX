@@ -43,7 +43,7 @@ export function composeSystemPrompt(
   if (artifacts.length > 0) {
     const lines = artifacts.map(
       (artifact) =>
-        `- ${ARTIFACT_LABELS[artifact.kind]}: ${artifact.title} (v${artifact.currentVersion})`,
+        `- ${ARTIFACT_LABELS[artifact.kind]}: ${artifact.title} (v${artifact.currentVersion}, id ${artifact.id})`,
     );
     sections.push(`Project artifacts:\n${lines.join("\n")}`);
   }

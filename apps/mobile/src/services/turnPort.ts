@@ -1,13 +1,16 @@
 import {
   AppError,
   createAdapter,
+  createArtifactRepository,
   createProjectContextRetriever,
   createProjectRepository,
   createProviderConfig,
   createProviderRepository,
+  createReadTools,
   createRetryingFetch,
   createSessionRepository,
   createTurnEngine,
+  READ_TOOL_GUIDANCE,
 } from "@projectx/core";
 import type {
   DbContext,
@@ -15,10 +18,9 @@ import type {
   ModelInfo,
   PartInput,
   ProviderRuntime,
-  ToolExecutor,
 } from "@projectx/core";
 
-import type { TurnAttachment } from "@projectx/ui";
+import type { ToolActivity, TurnAttachment } from "@projectx/ui";
 
 import type { ImageAttachment } from "./attachments";
 
@@ -29,18 +31,6 @@ import { composeSystemPrompt, parseSelectionId, priceTurn } from "./turnMath";
 const MAX_OUTPUT_TOKENS = 4_096;
 
 const fetchImpl: FetchLike = createRetryingFetch((url, init) => fetch(url, init));
-
-/** Tools arrive with the document pipeline; the engine still needs an executor. */
-const noTools: ToolExecutor = {
-  async execute(call) {
-    return {
-      toolCallId: call.id,
-      name: call.name,
-      content: "No tools are available yet.",
-      isError: true,
-    };
-  },
-};
 
 export interface TurnUsage {
   readonly model: string;
@@ -56,10 +46,14 @@ export interface TurnUsage {
  */
 export interface TurnSink {
   onUserTurn(id: string, text: string, attachments?: readonly TurnAttachment[]): void;
-  onAssistantStart(id: string, reasoningRequested: boolean): void;
+  /** `step` is 1 for the first assistant message of a turn and 2+ after each tool round. */
+  onAssistantStart(id: string, reasoningRequested: boolean, step: number): void;
   onText(id: string, text: string): void;
   onReasoning(id: string, text: string): void;
+  onToolActivity(id: string, activity: ToolActivity): void;
   onUsage(id: string, usage: TurnUsage): void;
+  /** Receives the final assistant message id so a multi-step turn can adopt it. */
+  onTurnFinished(id: string | null): void;
   onSettled(): void;
   onError(message: string): void;
 }
@@ -129,10 +123,11 @@ export function createTurnPort(sink: TurnSink): TurnPort {
         baseUrl: provider.baseUrl,
       });
       const runtime: ProviderRuntime = { config, apiKey, fetch: fetchImpl };
+      const tools = createReadTools(context);
       const engine = createTurnEngine({
         db: context,
         adapter: createAdapter(config.protocol),
-        tools: noTools,
+        tools,
       });
 
       controller = new AbortController();
@@ -144,6 +139,7 @@ export function createTurnPort(sink: TurnSink): TurnPort {
         system,
         effort: input.effort,
         userParts: input.regenerate ? [] : userParts(input),
+        tools: model.capabilities.tools ? tools.schemas : [],
         maxOutputTokens: Math.min(model.maxOutput, MAX_OUTPUT_TOKENS),
         signal: controller.signal,
         onEvent: (event) => {
@@ -154,7 +150,7 @@ export function createTurnPort(sink: TurnSink): TurnPort {
               }
               break;
             case "message_started":
-              sink.onAssistantStart(event.messageId, input.think);
+              sink.onAssistantStart(event.messageId, input.think, event.step);
               break;
             case "text_delta":
               sink.onText(event.messageId, event.text);
@@ -163,6 +159,16 @@ export function createTurnPort(sink: TurnSink): TurnPort {
               if (input.think) {
                 sink.onReasoning(event.messageId, event.text);
               }
+              break;
+            case "tool_result":
+              sink.onToolActivity(event.assistantMessageId, {
+                kind: event.role === "write" ? "wrote" : "read",
+                tool: event.result.name,
+                detail: event.result.display ?? event.result.name,
+              });
+              break;
+            case "turn_finished":
+              sink.onTurnFinished(event.messageId);
               break;
             case "usage":
               sink.onUsage(
@@ -207,24 +213,38 @@ export function createTurnPort(sink: TurnSink): TurnPort {
   };
 }
 
-/** A standalone chat gets no project context, and an empty project adds nothing. */
+/**
+ * Project chats get guidance, retrieved library text, and the artifact catalog. Standalone
+ * chats still get their own artifact catalog and the read-tool instruction when supported.
+ */
 async function systemPromptFor(
   context: DbContext,
   input: TurnInput,
   model: ModelInfo,
 ): Promise<string> {
   const session = await createSessionRepository(context).get(input.sessionId);
-  if (!session?.projectId) {
-    return "";
-  }
-  const project = await createProjectRepository(context).get(session.projectId);
-  const retrieved = await createProjectContextRetriever(context).retrieve({
-    projectId: session.projectId,
-    sessionId: input.sessionId,
-    query: input.text,
-    maxTokens: retrievalBudget(model),
-  });
-  return composeSystemPrompt(project?.instructions, retrieved.text, retrieved.artifacts);
+  const project = session?.projectId
+    ? await createProjectRepository(context).get(session.projectId)
+    : null;
+  const retrieved = session?.projectId
+    ? await createProjectContextRetriever(context).retrieve({
+      projectId: session.projectId,
+      sessionId: input.sessionId,
+      query: input.text,
+      maxTokens: retrievalBudget(model),
+    })
+    : null;
+  const artifacts = retrieved?.artifacts ?? (
+    session
+      ? await createArtifactRepository(context).listSummaries({
+        projectId: null,
+        sessionId: session.id,
+      })
+      : []
+  );
+  const base = composeSystemPrompt(project?.instructions, retrieved?.text, artifacts);
+  const guidance = model.capabilities.tools ? READ_TOOL_GUIDANCE : "";
+  return [base, guidance].filter(Boolean).join("\n\n");
 }
 
 /** Retrieval gets a quarter of the model window, bounded so small and huge models stay sane. */

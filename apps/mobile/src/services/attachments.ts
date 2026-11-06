@@ -10,7 +10,7 @@ export interface ImageAttachment {
 }
 
 export interface AttachmentRules {
-  /** Project chats attach documents through the library; other chats cannot read them. */
+  /** A session screen enables this once it exists; the new-chat screen has no chat to own a file. */
   readonly documentsAllowed?: boolean;
 }
 
