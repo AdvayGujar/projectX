@@ -58,7 +58,7 @@ export function createSearchRepository({ db }: DbContext) {
       if (!match) {
         return [];
       }
-      const { filter, params } = buildFilter(options.projectId, "s.project_id");
+      const { filter, params } = buildChunkFilter(options.projectId);
       const result = await db.execute(
         `SELECT c.id AS chunk_id, c.document_id, d.file_id, c.page, c.section,
                 snippet(doc_chunks_fts, 0, '[', ']', '…', 12) AS snippet,
@@ -67,7 +67,7 @@ export function createSearchRepository({ db }: DbContext) {
          JOIN doc_chunks c ON c.rowid = doc_chunks_fts.rowid
          JOIN documents d ON d.id = c.document_id
          JOIN files f ON f.id = d.file_id
-         JOIN sessions s ON s.id = f.session_id
+         LEFT JOIN sessions s ON s.id = f.session_id
          WHERE doc_chunks_fts MATCH ? AND d.status = 'ready'${filter}
          ORDER BY rank
          LIMIT ?`,
@@ -107,6 +107,21 @@ function buildFilter(projectId: string | null | undefined, column: string): { fi
     return { filter: ` AND ${column} IS NULL`, params: [] };
   }
   return { filter: ` AND ${column} = ?`, params: [projectId] };
+}
+
+/**
+ * Chunks have two possible owners: a project library file, or a session file. A project
+ * search covers both the project's own library and legacy files still owned by its chats.
+ * A standalone search only covers chats that were never in a project.
+ */
+function buildChunkFilter(projectId: string | null | undefined): { filter: string; params: SqlValue[] } {
+  if (projectId === undefined) {
+    return { filter: "", params: [] };
+  }
+  if (projectId === null) {
+    return { filter: " AND f.session_id IS NOT NULL AND s.project_id IS NULL", params: [] };
+  }
+  return { filter: " AND (s.project_id = ? OR f.project_id = ?)", params: [projectId, projectId] };
 }
 
 function limitOf(options: SearchOptions): number {
