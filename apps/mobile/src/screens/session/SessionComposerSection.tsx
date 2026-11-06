@@ -5,6 +5,8 @@ import type { ReactElement } from "react";
 export interface SessionComposerSectionProps {
   readonly text: string;
   readonly think: boolean;
+  readonly thinkLabel: string;
+  readonly thinkLocked: boolean;
   readonly search: boolean;
   readonly streaming: boolean;
   readonly attachments: readonly AttachmentChip[];
@@ -23,6 +25,8 @@ export interface SessionComposerSectionProps {
 export function SessionComposerSection({
   text,
   think,
+  thinkLabel,
+  thinkLocked,
   search,
   streaming,
   attachments,
@@ -43,6 +47,8 @@ export function SessionComposerSection({
         value={text}
         placeholder="Reply or hold to talk"
         think={think}
+        thinkLabel={thinkLabel}
+        thinkLocked={thinkLocked}
         search={search}
         streaming={streaming}
         attachments={attachments}

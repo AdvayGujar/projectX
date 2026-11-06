@@ -6,6 +6,7 @@ import {
   ModelPickerSheet,
   SourcesSheet,
   colors,
+  effortLabel,
 } from "@projectx/ui";
 import * as Clipboard from "expo-clipboard";
 import * as DocumentPicker from "expo-document-picker";
@@ -24,6 +25,12 @@ import { loadCitationSource } from "../../src/services/citationSource";
 import { ingestFile } from "../../src/services/documentIngest";
 import { describeError } from "../../src/services/errorMessage";
 import { openFileById } from "../../src/services/filePreview";
+import {
+  clampReasoningRequest,
+  recordedEffort,
+  reasoningRequestFor,
+  thinkPresentation,
+} from "../../src/services/reasoningChoice";
 import { SessionComposerSection } from "../../src/screens/session/SessionComposerSection";
 import { SessionTopBar } from "../../src/screens/session/SessionTopBar";
 import {
@@ -57,7 +64,7 @@ export default function SessionScreen(): ReactElement {
   const setError = useSessionStore((state) => state.setError);
 
   const [text, setText] = useState("");
-  const [think, setThink] = useState(true);
+  const [thinkOff, setThinkOff] = useState(false);
   const [search, setSearch] = useState(false);
   const [muted, setMuted] = useState(false);
   const [pinned, setPinned] = useState(false);
@@ -100,6 +107,7 @@ export default function SessionScreen(): ReactElement {
     () => turns.flatMap((turn) => turn.sources ?? []),
     [turns],
   );
+  const think = thinkPresentation(currentModel, thinkOff);
 
   async function send(): Promise<void> {
     const value = text.trim();
@@ -135,12 +143,13 @@ export default function SessionScreen(): ReactElement {
     setNotice(null);
     setText("");
     setAttachments([]);
+    const reasoning = reasoningRequestFor(currentModel, thinkOff);
     void turnService.send({
       sessionId,
       selectionId: currentModel.id,
-      effort: currentModel.effort,
+      effort: recordedEffort(reasoning),
       text: value,
-      think,
+      reasoning,
       images,
       documents,
     });
@@ -230,12 +239,14 @@ export default function SessionScreen(): ReactElement {
       }
       beginSession(sessionId, loaded.title, loaded.turns, loaded.totals);
       setError(null);
+      const targetModel = models.find((model) => model.id === target.selectionId) ?? null;
+      const reasoning = clampReasoningRequest(targetModel, target.reasoning);
       void turnService.send({
         sessionId,
         selectionId: target.selectionId,
-        effort: target.effort,
+        effort: recordedEffort(reasoning),
         text: target.text,
-        think,
+        reasoning,
         regenerate: true,
       });
     } catch {
@@ -324,7 +335,7 @@ export default function SessionScreen(): ReactElement {
       <View style={styles.fill}>
         <SessionTopBar
         modelLabel={currentModel?.label ?? "Select model"}
-        effort={currentModel?.effort}
+        effort={currentModel ? effortLabel(currentModel.effort) : undefined}
         onOpenDrawer={openDrawer}
         onOpenModelPicker={() => setPickerOpen(true)}
         onOpenMenu={() => setMenuOpen(true)}
@@ -359,13 +370,15 @@ export default function SessionScreen(): ReactElement {
 
       <SessionComposerSection
         text={text}
-        think={think}
+        think={think.active}
+        thinkLabel={think.label}
+        thinkLocked={think.locked}
         search={search}
         streaming={streaming}
         attachments={attachments}
         usage={usage}
         onChangeText={setText}
-        onToggleThink={() => setThink((value) => !value)}
+        onToggleThink={() => setThinkOff((value) => !value)}
         onToggleSearch={() => setSearch((value) => !value)}
         onAttach={() => {
           void attach();
@@ -412,8 +425,10 @@ export default function SessionScreen(): ReactElement {
         visible={pickerOpen}
         models={models}
         selectedId={currentModel?.id ?? null}
+        selectedEffort={currentModel?.effort}
         onSelect={(model, effort) => {
           setNotice(null);
+          setThinkOff(false);
           selectModel(model, effort);
         }}
         onClose={() => setPickerOpen(false)}

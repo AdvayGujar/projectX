@@ -1,4 +1,5 @@
 import type { ModelOption } from "@projectx/ui";
+import { normalizeReasoningEffort } from "@projectx/core";
 import { create } from "zustand";
 
 /**
@@ -19,12 +20,21 @@ export const useModelStore = create<ModelState>((set) => ({
     set((state) => {
       const refreshed = models.find((model) => model.id === state.current?.id);
       const current = refreshed
-        ? { ...refreshed, effort: state.current?.effort ?? refreshed.effort }
+        ? { ...refreshed, effort: reconcileEffort(refreshed, state.current?.effort) }
         : (models[0] ?? null);
       return { models, current };
     }),
   select: (model, effort) =>
     set({
-      current: { ...model, effort },
+      current: { ...model, effort: reconcileEffort(model, effort) },
     }),
 }));
+
+/** A refreshed catalog can drop an effort level the old selection still names. */
+function reconcileEffort(model: ModelOption, effort: string | undefined): string {
+  const normalized = normalizeReasoningEffort(effort);
+  if (normalized && model.reasoningEfforts.includes(normalized)) {
+    return normalized;
+  }
+  return model.effort;
+}

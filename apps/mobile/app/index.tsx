@@ -6,6 +6,7 @@ import {
   ModelPickerSheet,
   SessionHeader,
   colors,
+  effortLabel,
 } from "@projectx/ui";
 import * as DocumentPicker from "expo-document-picker";
 import { useRouter } from "expo-router";
@@ -16,6 +17,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useOpenDrawer } from "../src/navigation/useOpenDrawer";
 import { attachmentProblem, readImageAttachments } from "../src/services/attachments";
+import {
+  recordedEffort,
+  reasoningRequestFor,
+  thinkPresentation,
+} from "../src/services/reasoningChoice";
 import { createSession } from "../src/services/sessionQueries";
 import { turnService } from "../src/services/turnService";
 import { useModelCatalog } from "../src/state/useModelCatalog";
@@ -37,13 +43,14 @@ export default function ChatsScreen(): ReactElement {
   const selectModel = useModelStore((state) => state.select);
 
   const [text, setText] = useState("");
-  const [think, setThink] = useState(true);
+  const [thinkOff, setThinkOff] = useState(false);
   const [search, setSearch] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [attachments, setAttachments] = useState<readonly AttachmentChip[]>([]);
   const [notice, setNotice] = useState<{ message: string; icon: IconName } | null>(null);
 
   useModelCatalog();
+  const think = thinkPresentation(currentModel, thinkOff);
   async function send(): Promise<void> {
     const value = text.trim();
     const selection = currentModel;
@@ -85,12 +92,13 @@ export default function ChatsScreen(): ReactElement {
       setText("");
       setAttachments([]);
       router.push({ pathname: "/session/[id]", params: { id: sessionId } });
+      const reasoning = reasoningRequestFor(selection, thinkOff);
       void turnService.send({
         sessionId,
         selectionId: selection.id,
-        effort: selection.effort,
+        effort: recordedEffort(reasoning),
         text: value,
-        think,
+        reasoning,
         images,
       });
     } catch {
@@ -148,7 +156,7 @@ export default function ChatsScreen(): ReactElement {
       <View style={[styles.fill, { paddingTop: insets.top }]}>
       <SessionHeader
         model={currentModel?.label ?? "Select model"}
-        effort={currentModel?.effort}
+        effort={currentModel ? effortLabel(currentModel.effort) : undefined}
         onOpenDrawer={openDrawer}
         onOpenModelPicker={() => setPickerOpen(true)}
       />
@@ -164,7 +172,9 @@ export default function ChatsScreen(): ReactElement {
       <Composer
         value={text}
         placeholder="Ask me. Task me."
-        think={think}
+        think={think.active}
+        thinkLabel={think.label}
+        thinkLocked={think.locked}
         search={search}
         streaming={false}
         attachments={attachments}
@@ -173,7 +183,7 @@ export default function ChatsScreen(): ReactElement {
           setAttachments((current) => current.filter((item) => item.id !== id));
         }}
         onChangeText={setText}
-        onToggleThink={() => setThink((value) => !value)}
+        onToggleThink={() => setThinkOff((value) => !value)}
         onToggleSearch={() => setSearch((value) => !value)}
         onAttach={() => {
           void attach();
@@ -189,8 +199,10 @@ export default function ChatsScreen(): ReactElement {
         visible={pickerOpen}
         models={models}
         selectedId={currentModel?.id ?? null}
+        selectedEffort={currentModel?.effort}
         onSelect={(model, effort) => {
           setNotice(null);
+          setThinkOff(false);
           selectModel(model, effort);
         }}
         onClose={() => setPickerOpen(false)}

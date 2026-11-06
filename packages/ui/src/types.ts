@@ -77,6 +77,10 @@ export interface ModelOption {
   readonly provider: string;
   readonly effort: string;
   readonly reasoning: boolean;
+  /** False means the model reasons even when the user turns Think off. */
+  readonly canDisableReasoning: boolean;
+  /** The effort levels this model actually accepts, in display order. */
+  readonly reasoningEfforts: readonly ReasoningEffort[];
   readonly vision: boolean;
   /** Whether the model can call the read tools that open attached documents. */
   readonly tools: boolean;
@@ -91,8 +95,8 @@ export interface AttachmentChip {
   readonly size: number | null;
 }
 
-/** Effort levels offered after choosing a reasoning-capable model. */
-export const REASONING_EFFORTS = ["Low", "Medium", "High"] as const;
+/** Effort levels a reasoning model can expose; each picker shows its own subset. */
+export const REASONING_EFFORTS = ["minimal", "low", "medium", "high", "xhigh", "max"] as const;
 export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
 
 export interface RecentSession {

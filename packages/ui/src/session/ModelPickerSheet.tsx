@@ -16,14 +16,16 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useKeyboardVisible } from "../primitives/useKeyboardVisible";
 
 import { Icon } from "../icons";
+import { effortLabel } from "./format";
 import { colors, HIT_SLOP, radius, space, typography } from "../theme";
 import type { ModelOption, ReasoningEffort } from "../types";
-import { REASONING_EFFORTS } from "../types";
 
 export interface ModelPickerSheetProps {
   readonly visible: boolean;
   readonly models: readonly ModelOption[];
   readonly selectedId: string | null;
+  /** The effort currently chosen for the selected model; the model row defaults otherwise. */
+  readonly selectedEffort?: string;
   readonly onSelect: (model: ModelOption, effort: string) => void;
   readonly onClose: () => void;
 }
@@ -36,6 +38,7 @@ export function ModelPickerSheet({
   visible,
   models,
   selectedId,
+  selectedEffort,
   onSelect,
   onClose,
 }: ModelPickerSheetProps): ReactElement {
@@ -53,11 +56,11 @@ export function ModelPickerSheet({
   }
 
   function choose(model: ModelOption): void {
-    if (model.reasoning) {
+    if (model.reasoning && model.reasoningEfforts.length > 0) {
       setPending(model);
       return;
     }
-    onSelect(model, "Standard");
+    onSelect(model, model.effort);
     close();
   }
 
@@ -104,7 +107,11 @@ export function ModelPickerSheet({
           </View>
 
           {pending ? (
-            <EffortStep model={pending} onChoose={chooseEffort} />
+            <EffortStep
+              model={pending}
+              selectedEffort={pending.id === selectedId ? selectedEffort : undefined}
+              onChoose={chooseEffort}
+            />
           ) : (
             <ModelStep
               groups={groups}
@@ -189,7 +196,7 @@ function ModelStep({
                       ) : null}
                     </View>
                     {model.reasoning ? (
-                      <Text style={styles.meta}>Reasoning · choose effort</Text>
+                      <Text style={styles.meta}>{reasoningMeta(model)}</Text>
                     ) : null}
                   </View>
                   {selected ? <Icon name="chevron" size={14} color={colors.text} /> : null}
@@ -209,29 +216,39 @@ function ModelStep({
 
 function EffortStep({
   model,
+  selectedEffort,
   onChoose,
 }: {
   readonly model: ModelOption;
+  readonly selectedEffort?: string;
   readonly onChoose: (effort: ReasoningEffort) => void;
 }): ReactElement {
+  const current = selectedEffort ?? model.effort;
   return (
     <View style={styles.step}>
       <Text style={styles.effortModel}>{model.label}</Text>
       <ScrollView style={styles.list}>
-        {REASONING_EFFORTS.map((effort) => (
+        {model.reasoningEfforts.map((effort) => (
           <Pressable
             key={effort}
             accessibilityRole="button"
             onPress={() => onChoose(effort)}
             style={styles.row}
           >
-            <Text style={styles.label}>{effort}</Text>
-            {model.effort === effort ? <Icon name="chevron" size={14} color={colors.text} /> : null}
+            <Text style={styles.label}>{effortLabel(effort)}</Text>
+            {current === effort ? <Icon name="chevron" size={14} color={colors.text} /> : null}
           </Pressable>
         ))}
       </ScrollView>
     </View>
   );
+}
+
+function reasoningMeta(model: ModelOption): string {
+  if (model.reasoningEfforts.length > 0) {
+    return "Reasoning · choose effort";
+  }
+  return model.canDisableReasoning ? "Reasoning" : "Reasoning · always on";
 }
 
 interface ModelGroup {

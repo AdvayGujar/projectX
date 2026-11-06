@@ -14,6 +14,9 @@ export interface ComposerProps {
   readonly onRemoveAttachment: (id: string) => void;
   readonly placeholder: string;
   readonly think: boolean;
+  /** "Think" or "Always on" when the model cannot disable reasoning. */
+  readonly thinkLabel: string;
+  readonly thinkLocked: boolean;
   readonly search: boolean;
   readonly streaming: boolean;
   readonly onChangeText: (value: string) => void;
@@ -35,6 +38,8 @@ export function Composer({
   onRemoveAttachment,
   placeholder,
   think,
+  thinkLabel,
+  thinkLocked,
   search,
   streaming,
   onChangeText,
@@ -76,7 +81,13 @@ export function Composer({
         ) : null}
 
         <View style={styles.modes}>
-          <ModeChip label="Think" icon="think" active={think} onPress={onToggleThink} />
+          <ModeChip
+            label={thinkLabel}
+            icon="think"
+            active={think}
+            disabled={thinkLocked}
+            onPress={onToggleThink}
+          />
           <ModeChip label="Search" icon="search" active={search} onPress={onToggleSearch} />
         </View>
 
@@ -135,20 +146,31 @@ interface ModeChipProps {
   readonly label: string;
   readonly icon: "think" | "search";
   readonly active: boolean;
+  readonly disabled?: boolean;
   readonly onPress: () => void;
 }
 
-function ModeChip({ label, icon, active, onPress }: ModeChipProps): ReactElement {
+function ModeChip({ label, icon, active, disabled = false, onPress }: ModeChipProps): ReactElement {
   return (
     <Pressable
       accessibilityRole="switch"
-      accessibilityState={{ checked: active }}
+      accessibilityState={{ checked: active, disabled }}
       accessibilityLabel={label}
+      disabled={disabled}
       hitSlop={HIT_SLOP}
       onPress={onPress}
-      style={[styles.chip, active ? styles.chipActive : undefined]}
+      style={[
+        styles.chip,
+        active ? styles.chipActive : undefined,
+        disabled ? styles.chipLocked : undefined,
+      ]}
     >
-      <Icon name={icon} size={12} color={active ? colors.text : colors.textFaint} strokeWidth={2} />
+      <Icon
+        name={icon}
+        size={12}
+        color={active ? colors.text : colors.textFaint}
+        strokeWidth={2}
+      />
       <Text style={[styles.chipLabel, active ? styles.chipLabelActive : undefined]}>{label}</Text>
     </Pressable>
   );
@@ -191,6 +213,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.10)",
     borderColor: "rgba(255,255,255,0.26)",
   },
+  chipLocked: { opacity: 0.55 },
   chipLabel: { fontSize: 11.5, fontWeight: "500", color: colors.textFaint },
   chipLabelActive: { color: colors.text },
   inputRow: { flexDirection: "row", alignItems: "flex-end", gap: space.sm, paddingHorizontal: 2 },

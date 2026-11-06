@@ -10,8 +10,10 @@ function model(overrides: Partial<ModelOption> = {}): ModelOption {
     id: "provider-1:deepseek-v4.1-flash",
     label: "DeepSeek V4.1 Flash",
     provider: "OpenCode Go",
-    effort: "Medium",
+    effort: "on",
     reasoning: true,
+    canDisableReasoning: false,
+    reasoningEfforts: [],
     vision: false,
     tools: true,
     ...overrides,
@@ -25,22 +27,39 @@ beforeEach(() => {
 describe("model store", () => {
   it("replaces the selected model when the refreshed catalog heals it", () => {
     store().setModels([model()]);
-    store().select(model(), "High");
+    store().select(model(), "on");
 
     store().setModels([model({ vision: true })]);
 
     expect(store().current?.vision).toBe(true);
-    expect(store().current?.effort).toBe("High");
+    expect(store().current?.effort).toBe("on");
   });
 
   it("keeps the selected id and drops a selection that disappeared", () => {
     store().setModels([model(), model({ id: "provider-1:other", label: "Other" })]);
-    store().select(model({ id: "provider-1:other" }), "Standard");
+    store().select(model({ id: "provider-1:other" }), "standard");
 
     store().setModels([model({ vision: true })]);
     expect(store().current?.id).toBe(model().id);
 
     store().setModels([]);
     expect(store().current).toBeNull();
+  });
+
+  it("keeps only an effort the selected model accepts", () => {
+    const adjustable = model({
+      effort: "medium",
+      canDisableReasoning: true,
+      reasoningEfforts: ["low", "medium", "high"],
+    });
+    store().setModels([adjustable]);
+    store().select(adjustable, "high");
+    expect(store().current?.effort).toBe("high");
+
+    store().setModels([adjustable]);
+    expect(store().current?.effort).toBe("high");
+
+    store().setModels([model({ effort: "on" })]);
+    expect(store().current?.effort).toBe("on");
   });
 });
