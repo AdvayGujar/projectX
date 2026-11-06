@@ -39,9 +39,9 @@ apps/mobile/
     spike/                      throwaway M0 checks
 
 packages/core/src/
-  providers/                    four wire-protocol adapters, catalog, and registry; capability
-                                presets, reasoning dialects, and search adapters land with
-                                M3.2a/M3.2b
+  providers/                    four wire-protocol adapters, per-model reasoning capabilities,
+                                preset dialect mapping, catalog, and registry; search adapters
+                                land with M3.2b
   engine/                       turn loop, context assembly, streamed parts
   tools/                        read-tool contracts, Zod schemas, and scoped implementations
   documents/                    path policy, kind detection, file importer, chunking,
@@ -175,8 +175,32 @@ component and the screen that composes it.
    the caller passes `{ documentsAllowed: true }`, while image vision and size checks always
    apply.
 
-### Cite a document read
+### Control reasoning for a turn
 
+1. Callers pass one neutral value, `RunTurnOptions.reasoning`:
+   `{ mode: "off" }` or `{ mode: "on"; effort? }`. `CompletionRequest` carries the same value;
+   adapters never see a provider-agnostic "think" boolean.
+2. `ModelCapabilities.reasoning` is per model: `{ supported, canDisable, efforts }`. The
+   curated values live in `providers/reasoning.ts`. A provider catalog can override them
+   through `FetchedModelInfo.reasoning`; `applyKnownCapabilities` heals rows cached before
+   the object shape existed (a stored boolean still loads).
+3. `assertReasoningRequest` runs before the user message is saved. It rejects `off` on an
+   always-on model, `on` on a model without reasoning, and an effort the model does not list.
+   A rejected toggle is never silently dropped.
+4. Each adapter maps the neutral value in `buildBody`:
+   `thinking`/`reasoning_effort` (DeepSeek, Groq), `reasoning.effort` (OpenAI Responses,
+   OpenRouter), `thinking.disabled` + `output_config.effort` (Anthropic), and
+   `thinkingConfig` (Google). Presets the app cannot verify expose no toggle (Go routes,
+   custom endpoints), so no adapter has to guess.
+5. The engine persists reasoning only when the turn runs with `mode: "on"`. `buildContext`
+   replays those parts only on assistant messages that contain a tool call, and only while the
+   current turn has reasoning on. DeepSeek gets `reasoning_content`, Anthropic gets signed
+   thinking blocks, and Google gets the call's `thoughtSignature`.
+6. The composer never owns provider knowledge. `apps/mobile/src/services/reasoningChoice.ts`
+   derives the pill (`Think` or locked `Always on`) and the request from `ModelOption`;
+   `ModelPickerSheet` renders `reasoningEfforts`, not a fixed list.
+
+### Cite a document read
 1. Read tools attach `citations` to their `ToolOutcome`: file id, name, kind, and the page or
    section. The executor preserves them and the engine persists them inside the
    `tool_result` part, so no schema migration is needed.
