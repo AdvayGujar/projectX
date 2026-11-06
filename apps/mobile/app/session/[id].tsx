@@ -18,11 +18,13 @@ import { useOpenDrawer } from "../../src/navigation/useOpenDrawer";
 import { SessionActions } from "../../src/screens/session/SessionActions";
 import { SessionBody } from "../../src/screens/session/SessionBody";
 import { attachmentProblem, readImageAttachments } from "../../src/services/attachments";
+import { planAttachmentOpen } from "../../src/services/attachmentOpen";
 import { ingestFile } from "../../src/services/documentIngest";
+import { describeError } from "../../src/services/errorMessage";
+import { openFileById } from "../../src/services/filePreview";
 import { SessionComposerSection } from "../../src/screens/session/SessionComposerSection";
 import { SessionTopBar } from "../../src/screens/session/SessionTopBar";
 import {
-  loadAttachment,
   loadSession,
   prepareRegeneration,
   type LoadedAttachment,
@@ -246,18 +248,19 @@ export default function SessionScreen(): ReactElement {
 
   async function openAttachment(turnId: string, index: number): Promise<void> {
     try {
-      const loaded = await loadAttachment(turnId, index);
-      if (!loaded) {
-        setNotice({ message: "That attachment is no longer available.", icon: "image" });
-        return;
+      const target = await planAttachmentOpen(turnId, index);
+      if (target.kind === "viewer") {
+        setViewer(target.attachment);
+      } else if (target.kind === "document") {
+        await openFileById(target.fileId);
+      } else {
+        setNotice({ message: target.message, icon: "attach" });
       }
-      if (loaded.kind !== "image" || !loaded.base64) {
-        setNotice({ message: "Preview is only available for images right now.", icon: "image" });
-        return;
-      }
-      setViewer(loaded);
-    } catch {
-      setNotice({ message: "Could not open the attachment.", icon: "image" });
+    } catch (failure) {
+      setNotice({
+        message: describeError(failure, "Could not open the attachment."),
+        icon: "attach",
+      });
     }
   }
 

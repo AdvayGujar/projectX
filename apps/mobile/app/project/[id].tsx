@@ -194,7 +194,13 @@ export default function ProjectScreen(): ReactElement {
                 onAddFile={() => {
                   void library.addFile();
                 }}
-                onAddLink={library.openLink}
+                onAddLink={library.openLinkDialog}
+                onOpenFile={(file) => {
+                  void library.openFile(file);
+                }}
+                onOpenLink={(link) => {
+                  void library.openLink(link);
+                }}
                 onRemoveFile={(file) => library.requestRemoval({ kind: "file", file })}
                 onRemoveLink={(link) => library.requestRemoval({ kind: "link", link })}
               />
@@ -255,7 +261,7 @@ export default function ProjectScreen(): ReactElement {
           onSubmit: (url) => {
             void library.submitLink(url);
           },
-          onClose: library.closeLink,
+          onClose: library.closeLinkDialog,
         }}
       />
     </View>

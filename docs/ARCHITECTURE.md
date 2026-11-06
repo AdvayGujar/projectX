@@ -155,12 +155,34 @@ component and the screen that composes it.
    explaining that its text could not be read.
 4. `send()` passes document chips as `{ fileId, name, mimeType }` in `TurnInput.documents`.
    The port writes one `attachment` part per document after the image parts, so transcript
-   chip indices line up with the stored part order. `loadAttachment` tolerates document parts
-   and returns `base64: null`; the viewer stays image-only.
+   chip indices line up with the stored part order. `loadAttachment` returns the stored
+   `fileId` for document parts, and the session screen opens them through the OS preview
+   service.
 5. A standalone chat has no library to read through, so it shows a notice that documents
    belong to a project instead of adding a chip. `attachmentProblem` blocks documents unless
    the caller passes `{ documentsAllowed: true }`, while image vision and size checks always
    apply.
+
+### Open a stored file
+
+1. `apps/mobile/src/services/filePreview.ts` is the only entry point. `openStoredFile(relativePath,
+   mimeType)` resolves the URI through `createAppFileStorage().uriFor`, refuses a missing file,
+   then asks `File.canPreview()`. A previewable file goes to `File.preview()` (Quick Look on
+   iOS, an `ACTION_VIEW` intent on Android) and returns `"preview"`.
+2. When the platform cannot preview it — Office formats, or no installed handler — the same
+   call uses `Sharing.shareAsync(uri, { mimeType, dialogTitle: "Open in…" })` if
+   `Sharing.isAvailableAsync()`, and returns `"shared"`. The file is handed off; nothing is
+   copied out of the sandbox.
+3. A missing file or a device with neither a viewer nor a share target throws an `AppError`
+   with a `userMessage`, so callers show inline text rather than a dialog.
+4. `openFileById(fileId)` loads the `files` row and delegates, so a caller only needs the id
+   stored on a transcript part. Library rows call `openStoredFile(file.path, file.mime)` and
+   link rows call `Linking.openURL`; both surfaces report failures through the same notice.
+5. The session screen keeps the existing lazy base64 load for images and uses
+   `AttachmentViewer`. Documents never load bytes in the app; they open through the OS.
+6. Page-level jumps (`p.12`, `Slide 4`, `Sheet1!B2`) wait for citations in M3.
+   `File.preview()` always opens at the start of the document, and neither platform exposes a
+   page offset.
 
 ### Add a provider
 
