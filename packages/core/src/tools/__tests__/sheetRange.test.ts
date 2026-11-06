@@ -19,6 +19,12 @@ describe("sheet ranges", () => {
       endColumn: 0,
       endRow: 0,
     });
+    expect(parseRange("$A$1:$B$2")).toEqual({
+      startColumn: 0,
+      startRow: 0,
+      endColumn: 1,
+      endRow: 1,
+    });
     expect(parseRange("1A")).toBeNull();
     expect(parseRange("A0")).toBeNull();
   });

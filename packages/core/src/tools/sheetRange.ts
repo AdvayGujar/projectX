@@ -15,7 +15,7 @@ const SECTION_PATTERN = /^(.+)!([A-Z]+\d+(?::[A-Z]+\d+)?)$/;
 
 /** Parses `A1:F40` or a single cell. Column numbers are zero-based. */
 export function parseRange(value: string): SheetRange | null {
-  const match = RANGE_PATTERN.exec(value.trim().toUpperCase());
+  const match = RANGE_PATTERN.exec(value.trim().toUpperCase().replace(/\$/g, ""));
   if (!match) {
     return null;
   }
