@@ -3,8 +3,9 @@ import type { AttachmentChip } from "@projectx/ui";
 
 import { attachmentProblem, MAX_IMAGE_BYTES } from "../attachments";
 
-const chat = { label: "DeepSeek Chat", vision: false };
-const vision = { label: "Gemini 4 Argon", vision: true };
+const chat = { label: "DeepSeek Chat", vision: false, tools: true };
+const vision = { label: "Gemini 4 Argon", vision: true, tools: true };
+const noTools = { label: "Basic Model", vision: true, tools: false };
 
 function image(overrides: Partial<AttachmentChip> = {}): AttachmentChip {
   return {
@@ -54,9 +55,17 @@ describe("attachment capability check", () => {
     );
   });
 
-  it("allows documents when the caller reads them through a project", () => {
+  it("allows documents when the model can read them", () => {
     expect(attachmentProblem([document()], vision, { documentsAllowed: true })).toBeNull();
-    expect(attachmentProblem([document()], null, { documentsAllowed: true })).toBeNull();
+  });
+
+  it("blocks documents for a model without tool support", () => {
+    expect(attachmentProblem([document()], noTools, { documentsAllowed: true })).toBe(
+      "Basic Model cannot read documents. Choose a model with tool support or remove the file.",
+    );
+    expect(attachmentProblem([document()], null, { documentsAllowed: true })).toBe(
+      "The selected model cannot read documents. Choose a model with tool support or remove the file.",
+    );
   });
 
   it("still enforces image rules when documents are allowed", () => {

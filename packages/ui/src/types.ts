@@ -68,6 +68,8 @@ export interface ModelOption {
   readonly effort: string;
   readonly reasoning: boolean;
   readonly vision: boolean;
+  /** Whether the model can call the read tools that open attached documents. */
+  readonly tools: boolean;
 }
 
 /** A file picked in the composer. Images become vision input; documents wait for extraction. */

@@ -13,6 +13,7 @@ function model(overrides: Partial<ModelOption> = {}): ModelOption {
     effort: "Medium",
     reasoning: true,
     vision: false,
+    tools: true,
     ...overrides,
   };
 }
