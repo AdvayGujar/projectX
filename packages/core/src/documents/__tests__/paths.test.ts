@@ -5,6 +5,9 @@ import {
   extensionForMime,
   extensionOf,
   fileRelativePath,
+  projectDirectory,
+  projectFileRelativePath,
+  projectLibraryDirectory,
   safeDisplayName,
   sessionFilesDirectory,
 } from "../index";
@@ -20,6 +23,20 @@ describe("document paths", () => {
     );
     expect(fileRelativePath("session-1", "file-1", "README", "text/plain")).toBe(
       "sessions/session-1/files/file-1.txt",
+    );
+  });
+
+  it("builds a project library path with the same naming rules", () => {
+    expect(projectDirectory("project-1")).toBe("projects/project-1");
+    expect(projectLibraryDirectory("project-1")).toBe("projects/project-1/library");
+    expect(projectFileRelativePath("project-1", "file-1", "Report.PDF", "application/pdf")).toBe(
+      "projects/project-1/library/file-1.pdf",
+    );
+    expect(projectFileRelativePath("project-1", "file-1", "photo.jpeg", "image/png")).toBe(
+      "projects/project-1/library/file-1.png",
+    );
+    expect(projectFileRelativePath("project-1", "file-1", "blob", "")).toBe(
+      "projects/project-1/library/file-1",
     );
   });
 
@@ -52,8 +69,16 @@ describe("document paths", () => {
   it("rejects unsafe session and file ids", () => {
     expect(() => sessionFilesDirectory("a/b")).toThrow();
     expect(() => sessionFilesDirectory("..")).toThrow();
+    expect(() => projectDirectory("../project")).toThrow();
+    expect(() => projectLibraryDirectory("../project")).toThrow();
     expect(() => fileRelativePath("../session", "file", "a.pdf", "application/pdf")).toThrow();
     expect(() => fileRelativePath("session", "../../file", "a.pdf", "application/pdf")).toThrow();
+    expect(() =>
+      projectFileRelativePath("../project", "file", "a.pdf", "application/pdf"),
+    ).toThrow();
+    expect(() =>
+      projectFileRelativePath("project", "../../file", "a.pdf", "application/pdf"),
+    ).toThrow();
   });
 
   it("joins under a root without doubling the separator", () => {

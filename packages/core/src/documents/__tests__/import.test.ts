@@ -16,8 +16,10 @@ interface FakeStorage {
     relativePath: string,
     options?: FileStorageOptions,
   ): Promise<{ size: number | null }>;
+  writeText(relativePath: string, text: string): Promise<{ size: number }>;
   remove(relativePath: string): Promise<void>;
   removeDirectory(relativePath: string): Promise<void>;
+  uriFor(relativePath: string): string;
 }
 
 function createFakeStorage(options: { failCopy?: boolean } = {}): FakeStorage {
@@ -34,11 +36,17 @@ function createFakeStorage(options: { failCopy?: boolean } = {}): FakeStorage {
       }
       return { size: 2048 };
     },
+    async writeText(_relativePath, text) {
+      return { size: text.length };
+    },
     async remove(relativePath) {
       removed.push(relativePath);
     },
     async removeDirectory(relativePath) {
       removed.push(relativePath);
+    },
+    uriFor(relativePath) {
+      return `file:///sandbox/${relativePath}`;
     },
   };
   return storage;
@@ -75,6 +83,7 @@ describe("file importer", () => {
     });
 
     expect(imported.file.sessionId).toBe(session.id);
+    expect(imported.file.projectId).toBeNull();
     expect(imported.file.name).toBe("Report.PDF");
     expect(imported.file.mime).toBe("application/pdf");
     expect(imported.file.kind).toBe("pdf");

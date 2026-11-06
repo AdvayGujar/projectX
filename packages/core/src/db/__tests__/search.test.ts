@@ -127,8 +127,7 @@ describe("search repository", () => {
     expect(hits[0]?.fileId).toBe("f");
   }));
 
-  it("keeps standalone chunks out of project searches", () => withContext(async (ctx) => {
-    const projects = createProjectRepository(ctx);
+  it("keeps standalone chunks out of project searches", () => withContext(async (ctx) => {    const projects = createProjectRepository(ctx);
     const sessions = createSessionRepository(ctx);
     const search = createSearchRepository(ctx);
     const project = await projects.create({ name: "Reports" });
@@ -157,5 +156,55 @@ describe("search repository", () => {
     expect(hits.map((hit) => hit.fileId)).toEqual(["grouped"]);
     const standalone = await search.chunks("keyword", { projectId: null });
     expect(standalone.map((hit) => hit.fileId)).toEqual(["loose"]);
+  }));
+
+  it("finds project-owned chunks only for their project", () => withContext(async (ctx) => {
+    const projects = createProjectRepository(ctx);
+    const sessions = createSessionRepository(ctx);
+    const search = createSearchRepository(ctx);
+    const project = await projects.create({ name: "Reports" });
+    const other = await projects.create({ name: "Other" });
+    const standalone = await sessions.create({});
+
+    for (const [fileId, projectId] of [
+      ["library", project.id],
+      ["other-library", other.id],
+    ] as const) {
+      await ctx.db.execute(
+        `INSERT INTO files (id, project_id, name, mime, size, path, kind, created_at)
+         VALUES (?, ?, 'report.pdf', 'application/pdf', 100, 'reports/report.pdf', 'pdf', 1)`,
+        [fileId, projectId],
+      );
+      await ctx.db.execute(
+        "INSERT INTO documents (id, file_id, status) VALUES (?, ?, 'ready')",
+        [`doc-${fileId}`, fileId],
+      );
+      await ctx.db.execute(
+        `INSERT INTO doc_chunks (id, document_id, ordinal, text, token_estimate)
+         VALUES (?, ?, 1, 'library keyword', 2)`,
+        [`chunk-${fileId}`, `doc-${fileId}`],
+      );
+    }
+
+    await ctx.db.execute(
+      `INSERT INTO files (id, session_id, name, mime, size, path, kind, created_at)
+       VALUES ('loose', ?, 'note.txt', 'text/plain', 1, 'sessions/s/files/loose.txt', 'text', 1)`,
+      [standalone.id],
+    );
+    await ctx.db.execute(
+      "INSERT INTO documents (id, file_id, status) VALUES ('doc-loose', 'loose', 'ready')",
+    );
+    await ctx.db.execute(
+      `INSERT INTO doc_chunks (id, document_id, ordinal, text, token_estimate)
+       VALUES ('chunk-loose', 'doc-loose', 1, 'library keyword', 2)`,
+    );
+
+    expect((await search.chunks("keyword", { projectId: project.id })).map((hit) => hit.fileId)).toEqual([
+      "library",
+    ]);
+    expect(await search.chunks("keyword", { projectId: other.id })).toHaveLength(1);
+    expect((await search.chunks("keyword", { projectId: null })).map((hit) => hit.fileId)).toEqual([
+      "loose",
+    ]);
   }));
 });

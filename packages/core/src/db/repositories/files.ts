@@ -4,11 +4,12 @@ import type { DbContext, DocumentRecord, FileKind, FileRecord, SqlCommand, SqlVa
 import { insertPendingDocumentCommand } from "./commands";
 import { toDbError } from "./errors";
 
-const FILE_COLUMNS = "id, session_id, name, mime, size, path, kind, created_at";
+const FILE_COLUMNS = "id, session_id, project_id, name, mime, size, path, kind, created_at";
 
 interface FileRow {
   id: string;
-  session_id: string;
+  session_id: string | null;
+  project_id: string | null;
   name: string;
   mime: string;
   size: number;
@@ -17,12 +18,19 @@ interface FileRow {
   created_at: number;
 }
 
+interface FileOwner {
+  readonly sessionId: string | null;
+  readonly projectId: string | null;
+}
+
 export interface AddFileInput {
   /**
    * Caller-supplied because the sandbox path is derived from the id before the row exists.
    */
   readonly id: string;
-  readonly sessionId: string;
+  /** Standalone chats own their imports; project chats write into the project library. */
+  readonly sessionId?: string | null;
+  readonly projectId?: string | null;
   readonly name: string;
   readonly mime: string;
   readonly size: number;
@@ -41,7 +49,7 @@ export function createFileRepository({ db, ids, now }: DbContext) {
       const file = normalizeFile(input, now());
       try {
         await db.execute(
-          `INSERT INTO files (${FILE_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO files (${FILE_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           fileParams(file),
         );
       } catch (error) {
@@ -59,7 +67,7 @@ export function createFileRepository({ db, ids, now }: DbContext) {
       const document = pendingDocument(ids(), file.id);
       const commands: SqlCommand[] = [
         [
-          `INSERT INTO files (${FILE_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO files (${FILE_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           fileParams(file),
         ],
         insertPendingDocumentCommand(document.id, file.id),
@@ -86,12 +94,27 @@ export function createFileRepository({ db, ids, now }: DbContext) {
       return result.rows.map((row) => mapFile(row as unknown as FileRow));
     },
 
+    /** Project library files only; legacy session files in a project chat are not included. */
     async listByProject(projectId: string): Promise<FileRecord[]> {
       const result = await db.execute(
-        `SELECT f.* FROM files f
-         JOIN sessions s ON s.id = f.session_id
-         WHERE s.project_id = ?
-         ORDER BY f.created_at DESC`,
+        "SELECT * FROM files WHERE project_id = ? ORDER BY created_at DESC",
+        [projectId],
+      );
+      return result.rows.map((row) => mapFile(row as unknown as FileRow));
+    },
+
+    /**
+     * Library rows for the project plus its saved links' summaries. A link snapshot is an
+     * implementation detail of the link, so the library shows the link instead of the file.
+     */
+    async listLibrary(projectId: string): Promise<FileRecord[]> {
+      const result = await db.execute(
+        `SELECT files.* FROM files
+         WHERE files.project_id = ?
+           AND NOT EXISTS (
+             SELECT 1 FROM project_links l WHERE l.snapshot_file_id = files.id
+           )
+         ORDER BY files.created_at DESC`,
         [projectId],
       );
       return result.rows.map((row) => mapFile(row as unknown as FileRow));
@@ -111,14 +134,15 @@ export type FileRepository = ReturnType<typeof createFileRepository>;
 
 function normalizeFile(input: AddFileInput, createdAt: number): FileRecord {
   const id = requireValue(input.id, "File id");
-  const sessionId = requireValue(input.sessionId, "Session id");
+  const owner = normalizeOwner(input);
   const name = normalizeName(input.name);
   const mime = requireValue(input.mime, "MIME type");
   const path = requireValue(input.path, "File path");
   assertSafeRelativePath(path);
   return {
     id,
-    sessionId,
+    sessionId: owner.sessionId,
+    projectId: owner.projectId,
     name,
     mime,
     size: normalizeSize(input.size),
@@ -128,10 +152,23 @@ function normalizeFile(input: AddFileInput, createdAt: number): FileRecord {
   };
 }
 
+/** A row has exactly one owner; the DB CHECK is the backstop, not the first line. */
+function normalizeOwner(input: AddFileInput): FileOwner {
+  const sessionId = optionalValue(input.sessionId);
+  const projectId = optionalValue(input.projectId);
+  if ((sessionId === null) === (projectId === null)) {
+    throw new AppError("db_invalid", "File must belong to exactly one session or project", {
+      userMessage: "The file is missing information.",
+    });
+  }
+  return { sessionId, projectId };
+}
+
 function fileParams(file: FileRecord): SqlValue[] {
   return [
     file.id,
     file.sessionId,
+    file.projectId,
     file.name,
     file.mime,
     file.size,
@@ -158,6 +195,7 @@ function mapFile(row: FileRow): FileRecord {
   return {
     id: row.id,
     sessionId: row.session_id,
+    projectId: row.project_id,
     name: row.name,
     mime: row.mime,
     size: Number(row.size),
@@ -194,4 +232,12 @@ function requireValue(value: string, label: string): string {
     });
   }
   return trimmed;
+}
+
+function optionalValue(value: string | null | undefined): string | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed || null;
 }

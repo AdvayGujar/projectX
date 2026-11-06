@@ -13,7 +13,7 @@ describe("migrations", () => {
   it("applies once and is idempotent", async () => {
     const db = createNodeDatabase();
     try {
-      expect(await migrate(db)).toBe(5);
+      expect(await migrate(db)).toBe(6);
       expect(await migrate(db)).toBe(0);
     } finally {
       await db.close();
@@ -37,6 +37,7 @@ describe("migrations", () => {
         "parts_fts_update",
         "doc_chunks",
         "doc_chunks_fts",
+        "project_links",
       ]));
     });
   });
@@ -50,13 +51,28 @@ describe("migrations", () => {
     });
   });
 
-  it("keeps files session-owned and gives artifacts a project home", async () => {
+  it("gives files an owner union and artifacts a project home", async () => {
     await withContext(async ({ db }) => {
       const files = await db.execute("PRAGMA table_info(files)");
       const fileColumns = files.rows.map((row) => String(row.name));
       expect(fileColumns).toContain("session_id");
-      expect(fileColumns).not.toContain("project_id");
+      expect(fileColumns).toContain("project_id");
       expect(fileColumns).not.toContain("origin");
+
+      const links = await db.execute("PRAGMA table_info(project_links)");
+      const linkColumns = links.rows.map((row) => String(row.name));
+      expect(linkColumns).toEqual(expect.arrayContaining([
+        "id",
+        "project_id",
+        "url",
+        "title",
+        "media_type",
+        "snapshot_file_id",
+        "status",
+        "error",
+        "fetched_at",
+        "created_at",
+      ]));
 
       const artifacts = await db.execute("PRAGMA table_info(artifacts)");
       const artifactColumns = artifacts.rows.map((row) => String(row.name));
@@ -68,9 +84,10 @@ describe("migrations", () => {
       );
       const names = indexes.rows.map((row) => String(row.name));
       expect(names).toContain("idx_files_session");
+      expect(names).toContain("idx_files_project");
+      expect(names).toContain("idx_project_links_project");
       expect(names).toContain("idx_artifacts_session");
       expect(names).toContain("idx_documents_file");
-      expect(names).not.toContain("idx_files_project");
       expect(names).toContain("idx_artifacts_project");
     });
   });
@@ -129,7 +146,7 @@ describe("migrations", () => {
          VALUES ('a', 1, '{}', 'model', 1)`,
       );
 
-      expect(await migrate(db)).toBe(2);
+      expect(await migrate(db)).toBe(3);
 
       // 004 rebuilds these pre-release tables; no shipped code has ever written them.
       for (const table of ["files", "documents", "doc_chunks", "artifacts", "artifact_versions"]) {
@@ -138,6 +155,75 @@ describe("migrations", () => {
       }
       const foreignKeys = await db.execute("PRAGMA foreign_key_check");
       expect(foreignKeys.rows).toHaveLength(0);
+    } finally {
+      await db.close();
+    }
+  });
+
+  it("keeps documents and chunks when files gain a project owner", async () => {
+    const db = createNodeDatabase();
+    try {
+      await applyThrough(db, 5);
+      await db.execute(
+        "INSERT INTO projects (id, name, created_at, updated_at) VALUES ('p', 'P', 1, 1)",
+      );
+      await db.execute(
+        "INSERT INTO sessions (id, project_id, title, created_at, updated_at) VALUES ('s', 'p', 'S', 1, 1)",
+      );
+      await db.execute(
+        `INSERT INTO files (id, session_id, name, mime, size, path, kind, created_at)
+         VALUES ('f', 's', 'report.pdf', 'application/pdf', 10, 'sessions/s/files/f.pdf', 'pdf', 1)`,
+      );
+      await db.execute(
+        `INSERT INTO documents (id, file_id, page_count, status, extracted_at)
+         VALUES ('d', 'f', 3, 'ready', 1)`,
+      );
+      await db.execute(
+        `INSERT INTO doc_chunks (id, document_id, ordinal, page, text, token_estimate)
+         VALUES ('c', 'd', 1, 1, 'surviving text', 2)`,
+      );
+
+      expect(await migrate(db)).toBe(1);
+
+      const files = await db.execute("SELECT id, session_id, project_id FROM files");
+      expect(files.rows).toEqual([{ id: "f", session_id: "s", project_id: null }]);
+
+      const documents = await db.execute("SELECT id, file_id, status FROM documents");
+      expect(documents.rows).toEqual([{ id: "d", file_id: "f", status: "ready" }]);
+
+      const chunks = await db.execute("SELECT id, document_id, text FROM doc_chunks");
+      expect(chunks.rows).toEqual([{ id: "c", document_id: "d", text: "surviving text" }]);
+
+      expect((await db.execute("PRAGMA foreign_key_check")).rows).toHaveLength(0);
+      expect(Number((await db.execute("PRAGMA foreign_keys")).rows[0]?.foreign_keys)).toBe(1);
+    } finally {
+      await db.close();
+    }
+  });
+
+  it("enforces one owner per file", async () => {
+    const db = createNodeDatabase();
+    try {
+      await migrate(db);
+      await db.execute(
+        "INSERT INTO projects (id, name, created_at, updated_at) VALUES ('p', 'P', 1, 1)",
+      );
+      await db.execute(
+        "INSERT INTO sessions (id, project_id, title, created_at, updated_at) VALUES ('s', 'p', 'S', 1, 1)",
+      );
+
+      const insert = `INSERT INTO files (id, session_id, project_id, name, mime, size, path, kind, created_at)
+                      VALUES (?, ?, ?, 'a.pdf', 'application/pdf', 1, 'a.pdf', 'pdf', 1)`;
+
+      await expect(db.execute(insert, ["none", null, null])).rejects.toThrow();
+      await expect(db.execute(insert, ["both", "s", "p"])).rejects.toThrow();
+
+      await db.execute(insert, ["session-owned", "s", null]);
+      await db.execute(insert, ["project-owned", null, "p"]);
+      expect((await db.execute("SELECT id FROM files ORDER BY id")).rows).toEqual([
+        { id: "project-owned" },
+        { id: "session-owned" },
+      ]);
     } finally {
       await db.close();
     }

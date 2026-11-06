@@ -30,6 +30,17 @@ export function sessionFilesDirectory(sessionId: string): string {
   return `sessions/${sessionId}/files`;
 }
 
+/** Root of a project's sandbox folder; deleting a project removes it whole. */
+export function projectDirectory(projectId: string): string {
+  assertSafeSegment(projectId, "project id");
+  return `projects/${projectId}`;
+}
+
+/** Directory that owns the files a project keeps after its chats are gone. */
+export function projectLibraryDirectory(projectId: string): string {
+  return `${projectDirectory(projectId)}/library`;
+}
+
 /**
  * `<session>/files/<fileId>.<ext>`. The id is the stable part; the extension is only there
  * so native viewers and share sheets can pick the right handler.
@@ -40,9 +51,23 @@ export function fileRelativePath(
   name: string,
   mime: string,
 ): string {
+  return filePathIn(sessionFilesDirectory(sessionId), fileId, name, mime);
+}
+
+/** `<project>/library/<fileId>.<ext>`, mirroring the session layout. */
+export function projectFileRelativePath(
+  projectId: string,
+  fileId: string,
+  name: string,
+  mime: string,
+): string {
+  return filePathIn(projectLibraryDirectory(projectId), fileId, name, mime);
+}
+
+function filePathIn(directory: string, fileId: string, name: string, mime: string): string {
   const extension = extensionForFile(name, mime);
   assertSafeSegment(fileId, "file id");
-  return `${sessionFilesDirectory(sessionId)}/${fileId}${extension ? `.${extension}` : ""}`;
+  return `${directory}/${fileId}${extension ? `.${extension}` : ""}`;
 }
 
 export function safeDisplayName(name: string): string {

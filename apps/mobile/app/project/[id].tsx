@@ -19,8 +19,10 @@ import { StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useOpenDrawer } from "../../src/navigation/useOpenDrawer";
+import { ProjectLibraryPanel } from "../../src/screens/project/ProjectLibraryPanel";
 import { ProjectOverlays } from "../../src/screens/project/ProjectOverlays";
 import { PlaceholderPanel, ProjectSessionsPanel } from "../../src/screens/project/ProjectPanels";
+import { useProjectLibrary } from "../../src/screens/project/useProjectLibrary";
 import { describeError } from "../../src/services/errorMessage";
 import {
   createSessionInProject,
@@ -29,6 +31,7 @@ import {
   listProjectSessions,
   updateProject,
 } from "../../src/services/projectService";
+import { listLibraryItems } from "../../src/services/projectLibraryService";
 import { useModelCatalog } from "../../src/state/useModelCatalog";
 import { useModelStore } from "../../src/state/modelStore";
 
@@ -50,26 +53,31 @@ export default function ProjectScreen(): ReactElement {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const library = useProjectLibrary(projectId);
+  const { setItems: setLibraryItems } = library;
 
   const reload = useCallback(async (): Promise<void> => {
     try {
-      const [found, chats] = await Promise.all([
+      const [found, chats, libraryItems] = await Promise.all([
         getProject(projectId),
         listProjectSessions(projectId),
+        listLibraryItems(projectId),
       ]);
       if (!found) {
         setProject(null);
         setSessions([]);
+        setLibraryItems([]);
         setNotice("Project not found.");
         return;
       }
       setProject(found);
       setSessions(chats);
+      setLibraryItems(libraryItems);
       setNotice(null);
     } catch (failure) {
       setNotice(describeError(failure, "Could not open this project."));
     }
-  }, [projectId]);
+  }, [projectId, setLibraryItems]);
 
   useFocusEffect(
     useCallback(() => {
@@ -119,8 +127,11 @@ export default function ProjectScreen(): ReactElement {
       return;
     }
     try {
-      await deleteProject(project.id);
+      const { cleanupWarning } = await deleteProject(project.id);
       setDeleteOpen(false);
+      if (cleanupWarning) {
+        setNotice(cleanupWarning);
+      }
       router.replace("/projects");
     } catch (failure) {
       setDeleteOpen(false);
@@ -151,6 +162,8 @@ export default function ProjectScreen(): ReactElement {
     }
   }
 
+  const message = notice ?? library.notice;
+
   return (
     <View style={[styles.root, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <ProjectHeader
@@ -159,7 +172,7 @@ export default function ProjectScreen(): ReactElement {
         onOpenMenu={() => setMenuOpen(true)}
       />
 
-      {notice ? <Text style={styles.notice}>{notice}</Text> : null}
+      {message ? <Text style={styles.notice}>{message}</Text> : null}
 
       {project ? (
         <>
@@ -173,6 +186,17 @@ export default function ProjectScreen(): ReactElement {
                 onNewChat={() => {
                   void newChat();
                 }}
+              />
+            ) : tab === "library" ? (
+              <ProjectLibraryPanel
+                items={library.items}
+                busy={library.fileBusy}
+                onAddFile={() => {
+                  void library.addFile();
+                }}
+                onAddLink={library.openLink}
+                onRemoveFile={(file) => library.requestRemoval({ kind: "file", file })}
+                onRemoveLink={(link) => library.requestRemoval({ kind: "link", link })}
               />
             ) : (
               <PlaceholderPanel tab={tab} />
@@ -215,6 +239,23 @@ export default function ProjectScreen(): ReactElement {
             void remove();
           },
           onCancel: () => setDeleteOpen(false),
+        }}
+        libraryRemoval={{
+          visible: library.removal !== null,
+          name: library.removal?.name ?? "item",
+          onConfirm: () => {
+            void library.confirmRemoval();
+          },
+          onCancel: library.cancelRemoval,
+        }}
+        link={{
+          visible: library.linkOpen,
+          busy: library.linkBusy,
+          error: library.linkError,
+          onSubmit: (url) => {
+            void library.submitLink(url);
+          },
+          onClose: library.closeLink,
         }}
       />
     </View>
