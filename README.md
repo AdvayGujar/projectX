@@ -1,11 +1,36 @@
 # ProjectX
 
 Local-first AI workspace for iOS and Android. Bring your own provider key, organise chats
-into projects, read PDFs and Office files, and generate presentations, spreadsheets, PDFs,
-and Word documents.
+into projects, read PDFs, keep documents/images/links in a project library, and generate
+presentations, spreadsheets, PDFs, and Word documents.
 
 Architecture and scope: `plan.md`.
 Engineering rules: `AGENTS.md`.
+
+## Status
+
+- **M0, M1, and M2 are complete.** 321 tests pass: core 196, ui 14, mobile 111.
+  `pnpm typecheck` passes.
+- **M2 includes:** session/project storage, PDF extraction and chunking, FTS, projects and
+  session actions, project instructions, the project library (files, images, summary-first
+  web links), project retrieval, project document attachments, OS viewers, and drawer search.
+- **Verified on device (2026-11-06):** iOS 27.2 simulator and the `ProjectX_Pixel` Android
+  emulator. Home, projects, project detail, library, search, file opening, and the session
+  menu render. Android without an installed PDF viewer uses the share sheet, as intended.
+- **Known gaps:** DOCX/XLSX/PPTX text extraction is not wired yet (the files open through the
+  OS viewer but the model cannot read them); full-page link reads wait for web search; artifact
+  spec reading waits for M4. `pnpm lint` is still a placeholder in every package.
+
+## Next: start at M3.1
+
+M3 is read tools, citations, and memory v1. Begin with the tool registry:
+
+1. Add `packages/core/src/tools/` with `list_files`, `read_document`, `read_sheet`,
+   `search_documents`, and `get_artifact`. Use Zod schemas and return structured results;
+   never throw from a tool.
+2. Register them in `apps/mobile/src/services/turnPort.ts`, replacing the `noTools` executor.
+3. Show tool activity in the existing `Thought` disclosure.
+4. Then add page/slide/sheet citations with tap-to-page, followed by memory v1.
 
 ## Requirements
 
