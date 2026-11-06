@@ -59,7 +59,7 @@ export default function ChatsScreen(): ReactElement {
       return;
     }
 
-    const problem = attachmentProblem(attachments, selection);
+    const problem = attachmentProblem(attachments, selection, { documentsAllowed: false });
     if (problem) {
       setNotice({ message: problem, icon: "image" });
       return;
@@ -108,6 +108,13 @@ export default function ChatsScreen(): ReactElement {
       return;
     }
     const mimeType = asset.mimeType ?? "application/octet-stream";
+    if (!mimeType.startsWith("image/")) {
+      setNotice({
+        message: "Documents belong to a project. Create this chat inside a project to add documents.",
+        icon: "attach",
+      });
+      return;
+    }
     setNotice(null);
     setAttachments((current) => [
       ...current,
@@ -115,7 +122,7 @@ export default function ChatsScreen(): ReactElement {
         id: asset.uri,
         name: asset.name,
         mimeType,
-        kind: mimeType.startsWith("image/") ? "image" : "document",
+        kind: "image",
         size: asset.size ?? null,
       },
     ]);

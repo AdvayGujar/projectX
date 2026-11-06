@@ -28,10 +28,28 @@ describe("composeSystemPrompt", () => {
     );
   });
 
-  it("returns nothing for blank or missing guidance", () => {
-    expect(composeSystemPrompt("   ")).toBe("");
-    expect(composeSystemPrompt(null)).toBe("");
-    expect(composeSystemPrompt(undefined)).toBe("");
+  it("adds retrieved library text and the artifact catalog", () => {
+    expect(
+      composeSystemPrompt("Keep answers short.", "[File: brief.pdf]\nRevenue grew.", [
+        { id: "a1", kind: "deck", title: "Q3 Review", currentVersion: 3 },
+        { id: "a2", kind: "sheet", title: "Forecast", currentVersion: 1 },
+      ]),
+    ).toBe(
+      [
+        "Project instructions:\nKeep answers short.",
+        "Project library:\n[File: brief.pdf]\nRevenue grew.",
+        "Project artifacts:\n- Deck: Q3 Review (v3)\n- Sheet: Forecast (v1)",
+      ].join("\n\n"),
+    );
+  });
+
+  it("omits empty sections and returns nothing when everything is empty", () => {
+    expect(composeSystemPrompt("", "   ", [])).toBe("");
+    expect(composeSystemPrompt(null, "", [])).toBe("");
+    expect(composeSystemPrompt(undefined, undefined, [])).toBe("");
+    expect(
+      composeSystemPrompt("  ", "[File: brief.pdf]\nRevenue grew.", []),
+    ).toBe("Project library:\n[File: brief.pdf]\nRevenue grew.");
   });
 });
 

@@ -18,6 +18,7 @@ import { useOpenDrawer } from "../../src/navigation/useOpenDrawer";
 import { SessionActions } from "../../src/screens/session/SessionActions";
 import { SessionBody } from "../../src/screens/session/SessionBody";
 import { attachmentProblem, readImageAttachments } from "../../src/services/attachments";
+import { ingestFile } from "../../src/services/documentIngest";
 import { SessionComposerSection } from "../../src/screens/session/SessionComposerSection";
 import { SessionTopBar } from "../../src/screens/session/SessionTopBar";
 import {
@@ -104,7 +105,9 @@ export default function SessionScreen(): ReactElement {
       setError("Choose a model before sending.");
       return;
     }
-    const problem = attachmentProblem(attachments, currentModel);
+    const problem = attachmentProblem(attachments, currentModel, {
+      documentsAllowed: projectId !== null,
+    });
     if (problem) {
       setNotice({ message: problem, icon: "image" });
       return;
@@ -116,6 +119,13 @@ export default function SessionScreen(): ReactElement {
       setNotice({ message: "Could not read the attached image. Try attaching it again.", icon: "image" });
       return;
     }
+    const documents = attachments
+      .filter((attachment) => attachment.kind === "document")
+      .map((attachment) => ({
+        fileId: attachment.id,
+        name: attachment.name,
+        mimeType: attachment.mimeType,
+      }));
     setError(null);
     setNotice(null);
     setText("");
@@ -127,6 +137,7 @@ export default function SessionScreen(): ReactElement {
       text: value,
       think,
       images,
+      documents,
     });
   }
 
@@ -140,16 +151,66 @@ export default function SessionScreen(): ReactElement {
       return;
     }
     const mimeType = asset.mimeType ?? "application/octet-stream";
+    if (mimeType.startsWith("image/")) {
+      addPickerAttachment(asset.uri, asset.name, mimeType, asset.size ?? null);
+      return;
+    }
+    if (projectId === null) {
+      setNotice({
+        message: "Documents belong to a project. Open a project chat to add this file to its library.",
+        icon: "attach",
+      });
+      return;
+    }
+    setNotice({ message: "Reading document…", icon: "attach" });
+    try {
+      const imported = await ingestFile({
+        sessionId,
+        sourceUri: asset.uri,
+        name: asset.name,
+        mime: mimeType,
+        size: asset.size ?? null,
+      });
+      if (imported.document.status === "error") {
+        setNotice({
+          message: `${imported.file.name} joined the project library, but its text could not be read.`,
+          icon: "attach",
+        });
+        return;
+      }
+      if (imported.document.status !== "ready") {
+        setNotice({
+          message: `${imported.file.name} joined the project library. This format cannot be read yet.`,
+          icon: "attach",
+        });
+        return;
+      }
+      setNotice(null);
+      setAttachments((current) => [
+        ...current,
+        {
+          id: imported.file.id,
+          name: imported.file.name,
+          mimeType: imported.file.mime,
+          kind: "document",
+          size: imported.file.size,
+        },
+      ]);
+    } catch {
+      setNotice({ message: "Could not add that document to the project library.", icon: "attach" });
+    }
+  }
+
+  function addPickerAttachment(
+    id: string,
+    name: string,
+    mimeType: string,
+    size: number | null,
+  ): void {
     setNotice(null);
     setAttachments((current) => [
       ...current,
-      {
-        id: asset.uri,
-        name: asset.name,
-        mimeType,
-        kind: mimeType.startsWith("image/") ? "image" : "document",
-        size: asset.size ?? null,
-      },
+      { id, name, mimeType, kind: "image", size },
     ]);
   }
 

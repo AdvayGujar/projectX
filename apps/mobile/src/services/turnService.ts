@@ -7,4 +7,4 @@ import { createTurnPort } from "./turnPort";
  */
 export const turnService = createTurnPort(createSessionStoreSink());
 
-export type { TurnInput, TurnPort, TurnSink, TurnUsage } from "./turnPort";
+export type { DocumentAttachment, TurnInput, TurnPort, TurnSink, TurnUsage } from "./turnPort";

@@ -1,4 +1,4 @@
-import type { ModelInfo } from "@projectx/core";
+import type { ArtifactSummary, ModelInfo } from "@projectx/core";
 
 /** Pure helpers behind the turn port, kept free of React Native for testing. */
 
@@ -16,10 +16,38 @@ export function parseSelectionId(id: string): SelectionRef | null {
   return { providerId: id.slice(0, separator), modelId: id.slice(separator + 1) };
 }
 
-/** Project guidance is the only system text a turn carries until memory lands (M2.3c). */
-export function composeSystemPrompt(instructions: string | null | undefined): string {
-  const trimmed = instructions?.trim() ?? "";
-  return trimmed.length === 0 ? "" : `Project instructions:\n${trimmed}`;
+const ARTIFACT_LABELS = {
+  deck: "Deck",
+  sheet: "Sheet",
+  doc: "Doc",
+} satisfies Record<ArtifactSummary["kind"], string>;
+
+/**
+ * The system text for a turn: guidance, retrieved library chunks, and the artifact catalog.
+ * Sections are omitted when empty, so a standalone chat or an empty project gets no prompt.
+ */
+export function composeSystemPrompt(
+  instructions: string | null | undefined,
+  libraryText: string | null | undefined = "",
+  artifacts: readonly ArtifactSummary[] = [],
+): string {
+  const sections: string[] = [];
+  const guidance = instructions?.trim() ?? "";
+  if (guidance.length > 0) {
+    sections.push(`Project instructions:\n${guidance}`);
+  }
+  const library = libraryText?.trim() ?? "";
+  if (library.length > 0) {
+    sections.push(`Project library:\n${library}`);
+  }
+  if (artifacts.length > 0) {
+    const lines = artifacts.map(
+      (artifact) =>
+        `- ${ARTIFACT_LABELS[artifact.kind]}: ${artifact.title} (v${artifact.currentVersion})`,
+    );
+    sections.push(`Project artifacts:\n${lines.join("\n")}`);
+  }
+  return sections.join("\n\n");
 }
 
 export interface PricedTurn {
