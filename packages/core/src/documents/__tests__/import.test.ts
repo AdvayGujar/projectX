@@ -16,6 +16,7 @@ interface FakeStorage {
     relativePath: string,
     options?: FileStorageOptions,
   ): Promise<{ size: number | null }>;
+  writeText(relativePath: string, text: string): Promise<{ size: number }>;
   remove(relativePath: string): Promise<void>;
   removeDirectory(relativePath: string): Promise<void>;
 }
@@ -33,6 +34,9 @@ function createFakeStorage(options: { failCopy?: boolean } = {}): FakeStorage {
         throw new Error("copy failed");
       }
       return { size: 2048 };
+    },
+    async writeText(_relativePath, text) {
+      return { size: text.length };
     },
     async remove(relativePath) {
       removed.push(relativePath);

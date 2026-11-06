@@ -11,6 +11,11 @@ export interface CopiedFile {
   readonly size: number | null;
 }
 
+export interface WrittenText {
+  /** Byte size the adapter wrote, used for the accompanying file row. */
+  readonly size: number;
+}
+
 export interface FileStoragePort {
   /** Copies an external picker URI to a safe path inside the app sandbox. */
   copyFromUri(
@@ -18,6 +23,11 @@ export interface FileStoragePort {
     relativePath: string,
     options?: FileStorageOptions,
   ): Promise<CopiedFile>;
+  /**
+   * Writes UTF-8 text to a sandbox path, creating parent directories. Used for generated
+   * snapshots such as a project link summary.
+   */
+  writeText(relativePath: string, text: string): Promise<WrittenText>;
   /**
    * Removes a sandbox file. A missing file is not an error. Cleanup deliberately takes no
    * signal: rollback must run even when the import was aborted.
@@ -41,4 +51,26 @@ export interface PdfRequestOptions {
 export interface PdfPort {
   getPageCount(fileUri: string, options?: PdfRequestOptions): Promise<number>;
   extractPage(fileUri: string, page: number, options?: PdfRequestOptions): Promise<string>;
+}
+
+/**
+ * Platform boundary for fetching a user-supplied link. Core only accepts HTTP(S); the
+ * adapter enforces the timeout, the size cap, and the user agent.
+ */
+export interface WebFetchInput {
+  readonly url: string;
+  readonly signal?: AbortSignal;
+}
+
+export interface WebFetchResult {
+  readonly status: number;
+  /** Base content type without parameters, or null when the server omitted it. */
+  readonly contentType: string | null;
+  /** Empty for non-text responses, which the importer stores as metadata only. */
+  readonly body: string;
+  readonly finalUrl: string;
+}
+
+export interface WebFetchPort {
+  fetch(input: WebFetchInput): Promise<WebFetchResult>;
 }

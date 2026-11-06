@@ -25,6 +25,9 @@ function createStorage(): RecordingStorage {
       copies.push(relativePath);
       return { size: 2048 };
     },
+    async writeText(_relativePath, text) {
+      return { size: text.length };
+    },
     async remove(relativePath) {
       removed.push(relativePath);
     },
