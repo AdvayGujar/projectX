@@ -20,6 +20,14 @@ export function createAppFileStorage(): FileStoragePort {
       return { size: destination.exists ? destination.size : null };
     },
 
+    async writeText(relativePath, text) {
+      const file = new File(joinUnderRoot(DOCUMENTS_ROOT, relativePath));
+      file.parentDirectory.create({ intermediates: true, idempotent: true });
+      file.create({ overwrite: true, intermediates: true });
+      await file.write(text);
+      return { size: file.size };
+    },
+
     async remove(relativePath) {
       const file = new File(joinUnderRoot(DOCUMENTS_ROOT, relativePath));
       if (file.exists) {
