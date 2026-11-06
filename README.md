@@ -9,28 +9,29 @@ Engineering rules: `AGENTS.md`.
 
 ## Status
 
-- **M0, M1, and M2 are complete.** 321 tests pass: core 196, ui 14, mobile 111.
-  `pnpm typecheck` passes.
-- **M2 includes:** session/project storage, PDF extraction and chunking, FTS, projects and
-  session actions, project instructions, the project library (files, images, summary-first
-  web links), project retrieval, project document attachments, OS viewers, and drawer search.
+- **M0, M1, M2, M3.1, and M3.2 are complete.** 384 tests pass: core 236, ui 24, mobile 124.
+  `pnpm typecheck` passes. `pnpm lint` is still a placeholder in every package.
+- **M3.1 includes:** `list_files`, `read_document`, `read_sheet`, `search_documents`, and
+  `get_artifact`; DOCX/XLSX/PPTX/text extraction into chunks; tool activity in the Thought row.
+- **M3.2 includes:** structured citations from read/search results, tappable source chips, and a
+  cited-page sheet with Open file.
+- **Known gaps:** the Think toggle does not send a reasoning field yet (M3.2a); web search and
+  full-page reads are M3.2b; memory v1 is M3.3; artifact creation and versions wait for M4.
 - **Verified on device (2026-11-06):** iOS 27.2 simulator and the `ProjectX_Pixel` Android
   emulator. Home, projects, project detail, library, search, file opening, and the session
   menu render. Android without an installed PDF viewer uses the share sheet, as intended.
-- **Known gaps:** DOCX/XLSX/PPTX text extraction is not wired yet (the files open through the
-  OS viewer but the model cannot read them); full-page link reads wait for web search; artifact
-  spec reading waits for M4. `pnpm lint` is still a placeholder in every package.
 
-## Next: start at M3.1
+## Next: M3.2a, then M3.2b
 
-M3 is read tools, citations, and memory v1. Begin with the tool registry:
+M3.1 and M3.2 are merged. The next work is:
 
-1. Add `packages/core/src/tools/` with `list_files`, `read_document`, `read_sheet`,
-   `search_documents`, and `get_artifact`. Use Zod schemas and return structured results;
-   never throw from a tool.
-2. Register them in `apps/mobile/src/services/turnPort.ts`, replacing the `noTools` executor.
-3. Show tool activity in the existing `Thought` disclosure.
-4. Then add page/slide/sheet citations with tap-to-page, followed by memory v1.
+1. **Reasoning control** — a neutral `ReasoningRequest`, per-model `canDisable`/effort
+   capabilities, adapter mapping, and reasoning history for tool loops. Think off must send
+   the provider's disable field, not just hide the block.
+2. **Web search** — provider-native first (DeepSeek/Kimi raw search+fetch, Anthropic/OpenAI/
+   Google/xAI/OpenRouter server tools, Groq browser search), then BYO third-party adapters
+   (Brave, Tavily, Exa, Firecrawl, Parallel). No app-run search service.
+3. **Then M3.3** — memory v1 (global/project memory, `update_memory`, budgeted context).
 
 ## Requirements
 
