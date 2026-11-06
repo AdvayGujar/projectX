@@ -36,6 +36,8 @@ const MIME_KINDS: readonly [prefix: string, kind: FileKind][] = [
   ["application/vnd.openxmlformats-officedocument.presentationml", "pptx"],
   ["text/csv", "xlsx"],
   ["application/csv", "xlsx"],
+  ["text/tab-separated-values", "xlsx"],
+  ["text/comma-separated-values", "xlsx"],
   ["image/", "image"],
   ["text/", "text"],
 ];
@@ -43,10 +45,15 @@ const MIME_KINDS: readonly [prefix: string, kind: FileKind][] = [
 /** Kind comes from the MIME type first, then the file name. Unknown files stay importable. */
 export function detectFileKind(name: string, mime: string): FileKind {
   const normalizedMime = mime.trim().toLowerCase();
+  const extension = extensionOf(name);
+  // Pickers often report CSV/TSV as text/plain; the extension is the stronger signal.
+  if (normalizedMime === "text/plain" && (extension === "csv" || extension === "tsv")) {
+    return "xlsx";
+  }
   for (const [prefix, kind] of MIME_KINDS) {
     if (normalizedMime.startsWith(prefix)) {
       return kind;
     }
   }
-  return EXTENSION_KINDS[extensionOf(name)] ?? "other";
+  return EXTENSION_KINDS[extension] ?? "other";
 }
