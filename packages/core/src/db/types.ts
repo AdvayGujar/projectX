@@ -24,13 +24,20 @@ export interface Migration {
   version: number;
   name: string;
   statements: string[];
+  /**
+   * A table rebuild that drops a parent table would cascade through its children while
+   * foreign keys are enforced. "off" disables them for the whole migration batch.
+   */
+  foreignKeys?: "off";
 }
 
 export type FileKind = "pdf" | "docx" | "xlsx" | "pptx" | "image" | "text" | "other";
 
+/** A file belongs to exactly one owner: a standalone session, or a project library. */
 export interface FileRecord {
   id: string;
-  sessionId: string;
+  sessionId: string | null;
+  projectId: string | null;
   name: string;
   mime: string;
   size: number;
@@ -50,6 +57,22 @@ export interface DocumentRecord {
   status: DocumentStatus;
   error: string | null;
   extractedAt: number | null;
+}
+
+export type ProjectLinkStatus = "pending" | "fetching" | "ready" | "error";
+
+/** A saved web link in a project library; its summary snapshot is a project-owned file. */
+export interface ProjectLink {
+  id: string;
+  projectId: string;
+  url: string;
+  title: string;
+  mediaType: string | null;
+  snapshotFileId: string | null;
+  status: ProjectLinkStatus;
+  error: string | null;
+  fetchedAt: number | null;
+  createdAt: number;
 }
 
 export interface DocChunk {

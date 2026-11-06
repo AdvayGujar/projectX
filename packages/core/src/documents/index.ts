@@ -13,6 +13,8 @@ export {
   extensionForMime,
   extensionOf,
   fileRelativePath,
+  projectFileRelativePath,
+  projectLibraryDirectory,
   safeDisplayName,
   sessionFilesDirectory,
 } from "./paths";
